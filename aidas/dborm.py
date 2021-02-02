@@ -37,22 +37,27 @@ class Transform:
 #-------------- Unused --------------------------
 class ColumnTransform(Transform):
     def __init__(self, colTransformFunc):
+        logging.info(f"[{time.ctime()}] ColumnTransform initiated")
         self.colTransformFunc = colTransformFunc;
 
     def applyTransformation(self, data):
+        logging.info(f"[{time.ctime()}] ColumnTransform apply transformation")
         return self.colTransformFunc(data);
 
 class TableTransform(Transform):
     def __init__(self, tableTransformFunc):
+        logging.info(f"[{time.ctime()}] TableTransform initiated")
         self.tableTransformFunc = tableTransformFunc;
 
     def applyTransformation(self, data):
+        logging.info(f"[{time.ctime()}] TableTransform apply transformation")
         return self.tableTransformFunc(data);
 #------------------------------------------------
 
 #Base class for all SQL Transformations.
 class SQLTransform(Transform):
     def __init__(self, source):
+        logging.info(f"[{time.ctime()}] SQLTransform initiated")
         self._source_    = weakref.proxy(source) if(source) else None;
         self.__columns__ = None;
     #The columns that will be produced once this transform is applied on its source.
@@ -73,9 +78,11 @@ class SQLSelectTransform(SQLTransform):
     def __init__(self, source, *selcols):
         super().__init__(source);
         self.__selcols__  = selcols;
+        logging.info('[logging] SQLSelectTransform is initiated')
 
     @property
     def genSQL(self):
+        logging.info('[logging] generating sql for SQLSelectTransform')
         selCondition = '';
         for sc in self.__selcols__: #iterate through the filter conditions.
             srccollist = sc.srcColList; #get the source columns list involved in each one.
@@ -94,6 +101,7 @@ class SQLSelectTransform(SQLTransform):
                          '(' + (self._source_.genSQL.sqlText) + ') ' + self._source_.tableName +
                       ' WHERE ' + selCondition
                     );
+        logging.info(f"{time.ctime()}] Generated selection sql: \"{sqlText}\"")
         return SQLQuery(sqlText);
 
 
@@ -101,6 +109,8 @@ class SQLSelectTransform(SQLTransform):
 class SQLJoinTransform(SQLTransform):
     def __init__(self, source1, source2, src1joincols, src2joincols, cols1=COL.NONE, cols2=COL.NONE, join=JOIN.INNER):
         super().__init__(None);
+
+        logging.info('[logging] SQLJoinTransform is initiated')
 
         if(not(join == JOIN.CROSS_JOIN) and len(src1joincols) != len(src2joincols)):
             raise AttributeError('src1joincols and src2joincols should have same number columns');
@@ -113,6 +123,7 @@ class SQLJoinTransform(SQLTransform):
 
     @property
     def columns(self):
+        logging.info(f'[{time.ctime()}] SQLJoinTransformation columns gets called')
         if(not self.__columns__):
             src1cols = self._source1_.columns;
             src2cols = self._source2_.columns;
@@ -1143,7 +1154,9 @@ class DBTable(TabularData):
 
     @property
     def rows(self):
+        logging.info(f'[{time.ctime()}] DBTable rows gets called')
         if(self.__data__ is None):
+            logging.info(f'[{time.ctime()}] DBTable No data available, getting from db query')
             (data, rows) = self.__dbc__._executeQry(self.genSQL.sqlText + ';');
             #Convert the results to an ordered dictionary format.
             if(not isinstance(data, collections.OrderedDict)):
@@ -1153,6 +1166,8 @@ class DBTable(TabularData):
                 data.clear();
                 data = data_;
             self.__data__ = data;
+            logging.info(f'[{time.ctime()}] query = "{self.genSQL.sqlText}"')
+        logging.info(f'[{time.ctime()}] __data__ type: {type(self.__data__)}')
         return self.__data__;
 
     @property
@@ -1166,6 +1181,7 @@ class DBTable(TabularData):
             self.matrix;
 
     def filter(self, *selcols):
+        logging.info(f'[{time.ctime()}] DBTable {self}.filter called ')
         return DataFrame(self, SQLSelectTransform(self, *selcols));
 
     def join(self, otherTable, src1joincols, src2joincols, cols1=COL.NONE, cols2=COL.NONE, join=JOIN.INNER):
@@ -1369,6 +1385,7 @@ class DBTable(TabularData):
 
 class DataFrame(TabularData):
     def __init__(self, source, transform, name=None, dbc=None):
+        logging.info(f'[{time.ctime()}] DataFrame initiated, source={source}, transform={transform}, name={name}')
         self.__source__ = source;
         self.__transform__ = transform;
 
@@ -1407,12 +1424,15 @@ class DataFrame(TabularData):
         #    return self.__source__[0].isDBQry and self.__source__[1].isDBQry and  (True if(not self.__transform__) else isinstance(self.__transform__, SQLTransform));
 
     def filter(self, *selcols):
+        logging.info(f'[{time.ctime()}] Dataframe {self}.filter called ')
         return DataFrame(self, SQLSelectTransform(self, *selcols));
 
     def join(self, otherTable, src1joincols, src2joincols, cols1=COL.NONE, cols2=COL.NONE, join=JOIN.INNER):
+        logging.info(f'[{time.ctime()}] Dataframe {self}.join called ')
         return DataFrame( (self, otherTable),  SQLJoinTransform(self, otherTable, src1joincols, src2joincols, cols1=cols1, cols2=cols2, join=join));
 
     def aggregate(self, projcols, groupcols=None):
+        logging.info(f'[{time.ctime()}] Dataframe {self}.aggregate called ')
         return DataFrame(self, SQLAggregateTransform(self, projcols, groupcols));
 
     #Short form
@@ -1493,6 +1513,7 @@ class DataFrame(TabularData):
         return self.__tableUDFExists__;
 
     def _genSQL_(self, doOrder=False):
+        logging.info(f'[{time.ctime()}] Dataframe {self}._genSQL gets called')
         #If this data frame is not based on a direct sql transform, convert it into a table UDF.
         if(not self.isDBQry):
             #self.loadData(); #Not required to explicitly load data as the DBC adapter will do this.
@@ -1506,6 +1527,9 @@ class DataFrame(TabularData):
             for c in self.columns: #Form list of columns for select
                 cols = (cols + ' ,' + c) if(cols) else c;
             sqlText = 'SELECT ' +  cols + ' FROM '  + self.__tableName__ + ( '()' if(AConfig.UDFTYPE == UDFTYPE.TABLEUDF) else '' );
+
+            logging.info(f'[{time.ctime()}] Dataframe {self}._genSQL tableUDF exists, SQLtext = {sqlText}')
+
             return SQLQuery(sqlText);
 
         if(self.__transform__):
@@ -1517,10 +1541,13 @@ class DataFrame(TabularData):
 
     @property
     def rows(self):
+        logging.info(f'[{time.ctime()}] Dataframe {self}.rows called ')
         #logging.debug("DataFrame: id {}, {} : rows called.".format(id(self), self.tableName));
         if(self.__data__ is None):
+            logging.info(f'[{time.ctime()}]No data available, transform = {self.__transform__}')
             #logging.debug("DataFrame: {} : rows called, need to produce data.".format(self.tableName));
             if(self.isDBQry):
+                logging.info(f'[{time.ctime()}]Generating data from DB query')
                 (data, rows) = self.dbc._executeQry(self._genSQL_(doOrder=True).sqlText + ';');
                 #Convert the results to an ordered dictionary format.
                 if(not isinstance(data, collections.OrderedDict)):
@@ -1531,12 +1558,18 @@ class DataFrame(TabularData):
                     data = data_;
                     self.__data__ = data;
             elif(isinstance(self.__transform__, AlgebraicVectorTransform)):
+
+                logging.info(f'[{time.ctime()}]Generating data from AlgebraicVectorTransform')
+
                 self.__data__ = self.__transform__.rows;
                 self.__columns__ = self.__transform__.columns;
                 self.__matrix__ = self.__transform__.matrix;
                 self.__rowNames__ = self.__transform__.rowNames;
                 #logging.debug("rows : this DataFrame is of instance AlgebraicVectorTransform and produced {} columns {}".format(len(self.__columns__), time.time()));
             elif(isinstance(self.__transform__, UserTransform) or isinstance(self.__transform__, ExternalDataTransform) or isinstance(self.__transform__, VirtualDataTransform) or isinstance(self.__transform__, StackTransform)):
+
+                logging.info(f'[{time.ctime()}]Generating data from user/external...')
+
                 #logging.debug("DataFrame: {} : rows called retrieving source rows.".format(self.tableName));
                 self.__data__ = self.__transform__.rows;
                 #logging.debug("DataFrame: {} : rows transform rows retrieved.".format(self.tableName));
@@ -1546,6 +1579,7 @@ class DataFrame(TabularData):
                     self.__matrix__ = self.__transform__.matrix;
                     #logging.debug("DataFrame: {} : rows transform matrix retrieved.".format(self.tableName));
             else:
+                logging.info(f'[{time.ctime()}]Generating data from SQLTransform (or scalerTransformation?)')
                 #logging.debug("DataFrame: {} : rows called retrieving source rowsNtransform.".format(self.tableName));
                 (srcrows, srctransformlist, rowNames) = self.__source__.rowsNtransform;
                 self.__data__ = self.__transform__.applyTransform(srcrows, srctransformlist);
@@ -1563,20 +1597,24 @@ class DataFrame(TabularData):
             self.__source__ = self.__transform__ = None;
 
         #logging.debug("DataFrame: id {}, {} : returning rows.".format(id(self), self.tableName));
+        logging.info(f'DataFrame: id {id(self)}, {self.tableName} : returning rows. __data__ type : {type(self.__data__)}');
         return self.__data__;
 
     @property
     def cdata(self):
+        logging.info(f'[{time.ctime()}] Dataframe {self}.cdata called ')
         return self.rows;
 
     def loadData(self, matrix=False):
         """Forces materialization of this Data Frame"""
+        logging.info(f'[{time.ctime()}] Dataframe {self}.loadData called ')
         self.rows;
         if(matrix):
             self.matrix;
 
     @property
     def matrix(self):
+        logging.info(f'[{time.ctime()}] Dataframe {self}.matrix called ')
         if(self.__matrix__ is None):
             rows = self.rows;
 
