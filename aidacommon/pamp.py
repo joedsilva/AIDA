@@ -96,6 +96,7 @@ PCMP_MAP = {
 
     # logical operator
     CMP.OR: map_or,
+    CMP.AND: map_and,
     CMP.NOT: map_not,
 
     #subquery
