@@ -13,6 +13,7 @@ import pandas as pd;
 from aidacommon.aidaConfig import AConfig, UDFTYPE;
 from aidacommon.dborm import *;
 from aidacommon.dbAdapter import DBC;
+from aidacommon.pamp import PCMP_MAP
 from aidacommon.utils import VirtualOrderedColumnsDict;
 
 #Simple wrapper class to encapsulate a query string.
@@ -71,6 +72,9 @@ class SQLTransform(Transform):
     @property
     def genSQL(self):pass;
 
+    #assume data is already loaded from the db into the memory
+    def execute_pandas(self):pass
+
 
 
 class SQLSelectTransform(SQLTransform):
@@ -78,13 +82,39 @@ class SQLSelectTransform(SQLTransform):
     def __init__(self, source, *selcols):
         super().__init__(source);
         self.__selcols__  = selcols;
-        logging.info('[logging] SQLSelectTransform is initiated')
+        logging.info(f'[logging] SQLSelectTransform is initiated')
+
+    def execute_pandas(self):
+        conditions = None
+        data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
+        logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
+        #convert ordered dict to pandas df
+        if not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame.from_dict(data)
+        # elif isinstance(data, collections.OrderedDict):
+        #         #     data = pd.DataFrame()
+
+        for sc in self.__selcols__:
+            logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
+            logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
+            operator = sc._operator_
+            if conditions:
+                conditions = conditions & PCMP_MAP[operator](data, sc)
+            else:
+                conditions = PCMP_MAP[operator](data, sc)
+
+        data = data[conditions]
+        logging.info(f'[{time.ctime()}] executed pandas select, data = {data.head(3)}')
+
+        return data
 
     @property
     def genSQL(self):
-        logging.info('[logging] generating sql for SQLSelectTransform')
+        logging.info(f'[{time.ctime()}] generating sql for SQLSelectTransform {self.__selcols__}, source type: {self._source_}')
         selCondition = '';
         for sc in self.__selcols__: #iterate through the filter conditions.
+            logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
+            logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
             srccollist = sc.srcColList; #get the source columns list involved in each one.
             for s in srccollist:
                 c=self._source_.columns.get(s) #check if the columns are present in the source
@@ -424,6 +454,7 @@ class SQLDistinctTransform(SQLTransform):
 class SliceTransform(Transform):
 
     def __init__(self, source, sliceinfo):
+        logging.info(f'[{time.ctime()}] SliceTransform Initiated, source = {source}, sliceinfo={sliceinfo}')
         super().__init__();
         self._source_ = weakref.proxy(source);
         self.__sliceinfo__ = sliceinfo;
@@ -1533,11 +1564,33 @@ class DataFrame(TabularData):
             return SQLQuery(sqlText);
 
         if(self.__transform__):
+            logging.info(f'[{time.ctime()}] Dataframe {self}._genSQL is transform')
             return self.__transform__._genSQL_(doOrder=doOrder) if(isinstance(self.__transform__, SQLOrderTransform)) else self.__transform__.genSQL;
         else:
             return self.__source__.genSQL;
 
     genSQL = property(_genSQL_);
+
+    def upstream_data_exist(self):
+        logging.info(f'[{time.ctime()}] In side upstream_data_exists. Checking for data for {type(self)} {self}, has data = {self.__data__}, '
+                     f'source {self.__source__}, has type {type(self.__source__)}')
+        if self.__data__:
+            return True
+        if isinstance(self.__source__, DBTable):
+            return True if self.__source__.__data__ else False
+        if isinstance(self.__source__, DataFrame):
+            return self.__source__.upstream_data_exist()
+
+
+    def execute_pandas(self):
+        if self.upstream_data_exist():
+            if self.__transform__:
+                logging.info(f'[{time.ctime()}] executePandasSql: is transform')
+                if isinstance(self.__transform__, SQLSelectTransform):
+                    return self.__transform__.execute_pandas()
+
+            return self.__data__ or self.__source__.__data__
+        return None
 
     @property
     def rows(self):
@@ -1547,16 +1600,28 @@ class DataFrame(TabularData):
             logging.info(f'[{time.ctime()}]No data available, transform = {self.__transform__}')
             #logging.debug("DataFrame: {} : rows called, need to produce data.".format(self.tableName));
             if(self.isDBQry):
-                logging.info(f'[{time.ctime()}]Generating data from DB query')
-                (data, rows) = self.dbc._executeQry(self._genSQL_(doOrder=True).sqlText + ';');
+                data = self.execute_pandas()
+                logging.info(f'[{time.ctime()}]After executePandasSql')
+                if data is None:
+                    logging.info(f'[{time.ctime()}]Generating data by _genSQL,')
+                    (data, rows) = self.dbc._executeQry(self._genSQL_(doOrder=True).sqlText + ';');
+                logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
                 #Convert the results to an ordered dictionary format.
+                if isinstance(data, pd.DataFrame):
+                    data_ = collections.OrderedDict()
+                    for c in self.columns:
+                        data_[c] = data[c].to_numpy()
+                    data = data_;
+                    self.__data__ = data;
                 if(not isinstance(data, collections.OrderedDict)):
+                    logging.info(f'[{time.ctime()}]converting data to orderedDict')
                     data_ = collections.OrderedDict();
                     for c in self.columns:
                         data_[c] = data[c];
-                    data.clear();
+                    # data.clear();
                     data = data_;
-                    self.__data__ = data;
+                self.__data__ = data;
+                logging.info(f'[{time.ctime()}] data : \n {self.__data__}')
             elif(isinstance(self.__transform__, AlgebraicVectorTransform)):
 
                 logging.info(f'[{time.ctime()}]Generating data from AlgebraicVectorTransform')
@@ -1603,7 +1668,9 @@ class DataFrame(TabularData):
     @property
     def cdata(self):
         logging.info(f'[{time.ctime()}] Dataframe {self}.cdata called ')
-        return self.rows;
+        self.rows;
+        logging.info(f'[{time.ctime()}] Dataframe {self}.cdata called, after calling rows ')
+        return self.rows
 
     def loadData(self, matrix=False):
         """Forces materialization of this Data Frame"""
