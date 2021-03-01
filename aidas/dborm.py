@@ -13,7 +13,7 @@ import pandas as pd;
 from aidacommon.aidaConfig import AConfig, UDFTYPE;
 from aidacommon.dborm import *;
 from aidacommon.dbAdapter import DBC;
-from aidacommon.pamp import PCMP_MAP
+from aidacommon.pamp import PCMP_MAP, f2pandas
 from aidacommon.utils import VirtualOrderedColumnsDict;
 
 #Simple wrapper class to encapsulate a query string.
@@ -82,29 +82,27 @@ class SQLSelectTransform(SQLTransform):
     def __init__(self, source, *selcols):
         super().__init__(source);
         self.__selcols__  = selcols;
-        logging.info(f'[logging] SQLSelectTransform is initiated')
 
     def execute_pandas(self):
         conditions = None
         data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
         logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
+
         #convert ordered dict to pandas df
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
-        # elif isinstance(data, collections.OrderedDict):
-        #         #     data = pd.DataFrame()
 
         for sc in self.__selcols__:
             logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
             logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
             operator = sc._operator_
-            if conditions:
-                conditions = conditions & PCMP_MAP[operator](data, sc)
-            else:
+            if conditions is None:
                 conditions = PCMP_MAP[operator](data, sc)
+            else:
+                conditions = conditions & PCMP_MAP[operator](data, sc)
 
         data = data[conditions]
-        logging.info(f'[{time.ctime()}] executed pandas select, data = {data.head(3)}')
+        logging.info(f'[{time.ctime()}] executed pandas select, condition = {conditions}, data = {data.head(3)}')
 
         return data
 
@@ -186,6 +184,9 @@ class SQLJoinTransform(SQLTransform):
             self.__columns__ = collections.OrderedDict(__extractsrccols__(src1cols, self._src1projcols_, self._source1_.tableName) +  __extractsrccols__(src2cols, self._src2projcols_, self._source2_.tableName));
             #self.__columns__ = { **__extractsrccols__(src1cols, self._src1projcols_), **__extractsrccols__(src2cols, self._src2projcols_) };
         return self.__columns__;
+
+    def execute_pandas(self):
+        pass
 
     @property
     def genSQL(self):
@@ -347,7 +348,15 @@ class SQLProjectionTransform(SQLTransform):
                     pc1 = c.get(sc1);           #and the alias name for projection.
                 else:
                     sc1 = pc1 = c;              #otherwise projected column name / function is the same as the source column.
-                #get a list of source columns needed for this expression.
+                collist = sc1.srcColList if (hasattr(sc1, 'srcColList')) else []
+                exp = sc1.columnExprAlias  if(hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount)
+                logging.info(f'{time.ctime()} Project columns: c = {c}, c type = {type(c)}, \n'
+                             f'sc1={sc1}, type sc1 = {type(sc1)}, pc1={pc1}, type pc1={type(pc1)}, '
+                             f'collist = {collist}, expAlias = {exp}')
+                if hasattr(sc1, "__dict__"):
+                    items = [f'{key}: {val}' for key, val in sc1.__dict__.items()]
+                    logging.info(', '.join(items))
+                    #get a list of source columns needed for this expression.
                 srccollist = [sc1] if(isinstance(sc1, str)) else ( sc1.srcColList if(hasattr(sc1, 'srcColList')) else []  )
                 #projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
                 projcol = pc1 if(isinstance(pc1, str)) else (sc1.columnExprAlias  if(hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
@@ -381,6 +390,48 @@ class SQLProjectionTransform(SQLTransform):
             self.__columns__ = columns;
 
         return self.__columns__;
+
+    def execute_pandas(self):
+        data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
+        logging.info(f'[{time.ctime()}] execute projection pandas, data type = {type(data)}')
+
+        if not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame.from_dict(data)
+
+        # Convert __proj_cols__ to param list used by pandas
+        # assign_params is used to handle F class and create a new column,
+        # rename_params is used for rename column names later,
+        # proj_cols is the final columns selected
+
+        assign_params, rename_params = {}
+        proj_cols = []
+
+        for c in range(len(self.__projcols__)):
+            if (isinstance(c, dict)):  # check if the projected column is given an alias name
+                sc1 = list(c.keys())[0];  # get the source column name / function
+                pc1 = c.get(sc1);  # and the alias name for projection.
+            else:
+                sc1 = pc1 = c;  # otherwise projected column name / function is the same as the source column.
+
+            logging.info(f'{time.ctime()} Project columns: c = {c}, c type = {type(c)}, \n')
+            if hasattr(sc1, "__dict__"):
+                items = [f'{key}: {val}' for key, val in sc1.__dict__.items()]
+                logging.info(', '.join(items))
+
+            if isinstance(sc1, str):
+                rename_params[sc1] = pc1
+            else:
+                f2pandas(data, sc1)
+
+
+        # get all columns required, and do computation on columns if needed
+        data = data.assign(assign_params)[proj_cols] if assign_params else data[proj_cols]
+        #rename columns if required
+        if proj_cols:
+            data = data.rename(rename_params)
+
+        return data
+
 
     @property
     def genSQL(self):
@@ -1455,15 +1506,12 @@ class DataFrame(TabularData):
         #    return self.__source__[0].isDBQry and self.__source__[1].isDBQry and  (True if(not self.__transform__) else isinstance(self.__transform__, SQLTransform));
 
     def filter(self, *selcols):
-        logging.info(f'[{time.ctime()}] Dataframe {self}.filter called ')
         return DataFrame(self, SQLSelectTransform(self, *selcols));
 
     def join(self, otherTable, src1joincols, src2joincols, cols1=COL.NONE, cols2=COL.NONE, join=JOIN.INNER):
-        logging.info(f'[{time.ctime()}] Dataframe {self}.join called ')
         return DataFrame( (self, otherTable),  SQLJoinTransform(self, otherTable, src1joincols, src2joincols, cols1=cols1, cols2=cols2, join=join));
 
     def aggregate(self, projcols, groupcols=None):
-        logging.info(f'[{time.ctime()}] Dataframe {self}.aggregate called ')
         return DataFrame(self, SQLAggregateTransform(self, projcols, groupcols));
 
     #Short form
@@ -1544,7 +1592,6 @@ class DataFrame(TabularData):
         return self.__tableUDFExists__;
 
     def _genSQL_(self, doOrder=False):
-        logging.info(f'[{time.ctime()}] Dataframe {self}._genSQL gets called')
         #If this data frame is not based on a direct sql transform, convert it into a table UDF.
         if(not self.isDBQry):
             #self.loadData(); #Not required to explicitly load data as the DBC adapter will do this.
@@ -1594,14 +1641,12 @@ class DataFrame(TabularData):
 
     @property
     def rows(self):
-        logging.info(f'[{time.ctime()}] Dataframe {self}.rows called ')
         #logging.debug("DataFrame: id {}, {} : rows called.".format(id(self), self.tableName));
         if(self.__data__ is None):
             logging.info(f'[{time.ctime()}]No data available, transform = {self.__transform__}')
             #logging.debug("DataFrame: {} : rows called, need to produce data.".format(self.tableName));
             if(self.isDBQry):
                 data = self.execute_pandas()
-                logging.info(f'[{time.ctime()}]After executePandasSql')
                 if data is None:
                     logging.info(f'[{time.ctime()}]Generating data by _genSQL,')
                     (data, rows) = self.dbc._executeQry(self._genSQL_(doOrder=True).sqlText + ';');
@@ -1667,9 +1712,6 @@ class DataFrame(TabularData):
 
     @property
     def cdata(self):
-        logging.info(f'[{time.ctime()}] Dataframe {self}.cdata called ')
-        self.rows;
-        logging.info(f'[{time.ctime()}] Dataframe {self}.cdata called, after calling rows ')
         return self.rows
 
     def loadData(self, matrix=False):
@@ -1681,7 +1723,6 @@ class DataFrame(TabularData):
 
     @property
     def matrix(self):
-        logging.info(f'[{time.ctime()}] Dataframe {self}.matrix called ')
         if(self.__matrix__ is None):
             rows = self.rows;
 
