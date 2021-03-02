@@ -13,7 +13,7 @@ import pandas as pd;
 from aidacommon.aidaConfig import AConfig, UDFTYPE;
 from aidacommon.dborm import *;
 from aidacommon.dbAdapter import DBC;
-from aidacommon.pamp import PCMP_MAP, f2pandas
+from aidacommon.pamp import PCMP_MAP, f2pandas, PJOIN_MAP
 from aidacommon.utils import VirtualOrderedColumnsDict;
 
 #Simple wrapper class to encapsulate a query string.
@@ -186,7 +186,22 @@ class SQLJoinTransform(SQLTransform):
         return self.__columns__;
 
     def execute_pandas(self):
-        pass
+        data1 = self._source1_.__data__ if self._source1_.__data__ else self._source1_.execute_pandas()
+        data2 = self._source2_.__data__ if self._source2_.__data__ else self._source2_.execute_pandas()
+        logging.info(f'[{time.ctime()}] execute join pandas, data type = {type(data1)}')
+        #convert ordered dict to pandas df
+        if not isinstance(data1, pd.DataFrame):
+            data1 = pd.DataFrame.from_dict(data1)
+        if not isinstance(data2, pd.DataFrame):
+            data2 = pd.DataFrame.from_dict(data2)
+
+        proj_cols = [c.columnName for c in self.columns]
+        if self._jointype_ == JOIN.CROSS_JOIN:
+            return data1.merge(data2, how='cross')[proj_cols]
+        else:
+            return pd.merge(data1, data2, left_on=self._src1joincols_, right_on=self._src2joincols_,
+                            how=PJOIN_MAP[self._jointype_])[proj_cols]
+
 
     @property
     def genSQL(self):

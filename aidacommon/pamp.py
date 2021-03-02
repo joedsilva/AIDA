@@ -3,7 +3,7 @@ import re
 
 import pandas as pd
 
-from aidacommon.dborm import CMP, DATE, Q, F, C, EXTRACT
+from aidacommon.dborm import CMP, DATE, Q, F, C, EXTRACT, JOIN
 
 
 def convert_type(func):
@@ -130,6 +130,14 @@ PCMP_MAP = {
     CMP.IN: map_in,
 
     CMP.LIKE: map_like,
+}
+
+PJOIN_MAP = {
+    JOIN.INNER_JOIN: 'inner',
+    JOIN.CROSS_JOIN: 'cross',
+    JOIN.LEFT_OUTER_JOIN: 'left',
+    JOIN.RIGHT_OUTER_JOIN: 'right',
+    JOIN.FULL_OUTER_JOIN: 'outer'
 }
 
 
