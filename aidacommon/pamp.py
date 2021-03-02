@@ -3,7 +3,7 @@ import re
 
 import pandas as pd
 
-from aidacommon.dborm import CMP, DATE, Q, F, C
+from aidacommon.dborm import CMP, DATE, Q, F, C, EXTRACT
 
 
 def convert_type(func):
@@ -145,18 +145,25 @@ def fop2pandas(data1, data2, op):
     if op == F.OP.NEGATIVE:
         return -data1
     if op == F.OP.YEAR:
-        return data1.dt.year
+        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
+        return ndata.dt.year
     if op == F.OP.MONTH:
-        return data1.dt.month
+        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
+        return ndata.dt.month
     if op == F.OP.DAY:
-        return data1.dt.day
+        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
+        return ndata.dt.day
+    return data1
 
 
 def f2pandas(data, f):
     cols = [f._col1_, f._col2_]
-    for col in cols:
-        if isinstance(col, F):
-            col = f2pandas(data, col)
-        elif isinstance(col, str):
-            col = data[col]
-    return fop2pandas(cols[0], cols[1], f.OP)
+    logging.info(f"col1: {cols[0]}, col2: {cols[1]}")
+    for i in range(len(cols)):
+        if isinstance(cols[i], F):
+            logging.info(f"IS F")
+            cols[i] = f2pandas(data, cols[i])
+        elif isinstance(cols[i], str):
+            cols[i] = data[cols[i]]
+    logging.info(f"after: col1: {cols[0]}, col2: {cols[1]}")
+    return fop2pandas(cols[0], cols[1], f._operator_)

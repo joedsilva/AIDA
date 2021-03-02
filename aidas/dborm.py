@@ -392,6 +392,7 @@ class SQLProjectionTransform(SQLTransform):
         return self.__columns__;
 
     def execute_pandas(self):
+        self.columns
         data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
         logging.info(f'[{time.ctime()}] execute projection pandas, data type = {type(data)}')
 
@@ -403,10 +404,10 @@ class SQLProjectionTransform(SQLTransform):
         # rename_params is used for rename column names later,
         # proj_cols is the final columns selected
 
-        assign_params, rename_params = {}
+        assign_params, rename_params = {}, {}
         proj_cols = []
 
-        for c in range(len(self.__projcols__)):
+        for c in self.__projcols__:
             if (isinstance(c, dict)):  # check if the projected column is given an alias name
                 sc1 = list(c.keys())[0];  # get the source column name / function
                 pc1 = c.get(sc1);  # and the alias name for projection.
@@ -419,16 +420,20 @@ class SQLProjectionTransform(SQLTransform):
                 logging.info(', '.join(items))
 
             if isinstance(sc1, str):
-                rename_params[sc1] = pc1
+                proj_cols.append(sc1) # select original column first
+                if sc1 != pc1:
+                    rename_params[sc1] = pc1 # then rename it
             else:
-                f2pandas(data, sc1)
-
+                proj_cols.append(pc1)
+                assign_params[pc1] = f2pandas(data, sc1)
 
         # get all columns required, and do computation on columns if needed
-        data = data.assign(assign_params)[proj_cols] if assign_params else data[proj_cols]
+        data = data.assign(**assign_params)[proj_cols] if assign_params else data[proj_cols]
+        logging.info(f'{time.ctime()} proj_cols: {proj_cols} \n rename_param: {rename_params} \n assign_param: {assign_params}')
         #rename columns if required
-        if proj_cols:
-            data = data.rename(rename_params)
+        if rename_params:
+            # data.rename(columns=rename_params, inplace=True)
+            data = data.rename(**{'columns': rename_params, 'inplace': True})
 
         return data
 
@@ -1633,8 +1638,7 @@ class DataFrame(TabularData):
         if self.upstream_data_exist():
             if self.__transform__:
                 logging.info(f'[{time.ctime()}] executePandasSql: is transform')
-                if isinstance(self.__transform__, SQLSelectTransform):
-                    return self.__transform__.execute_pandas()
+                return self.__transform__.execute_pandas()
 
             return self.__data__ or self.__source__.__data__
         return None
@@ -1653,6 +1657,7 @@ class DataFrame(TabularData):
                 logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
                 #Convert the results to an ordered dictionary format.
                 if isinstance(data, pd.DataFrame):
+                    logging.info(f'Converting pd to dict, columns = {self.columns}')
                     data_ = collections.OrderedDict()
                     for c in self.columns:
                         data_[c] = data[c].to_numpy()
