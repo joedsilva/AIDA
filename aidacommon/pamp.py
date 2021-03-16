@@ -2,8 +2,9 @@ import logging
 import re
 
 import pandas as pd
+import numpy as np
 
-from aidacommon.dborm import CMP, DATE, Q, F, C, EXTRACT, JOIN
+from aidacommon.dborm import CMP, DATE, Q, F, C, EXTRACT, JOIN, SUBSTRING, CASE
 
 
 def convert_type(func):
@@ -55,22 +56,42 @@ def map_lte(data, sc):
     return data <= sc._col2_
 
 
+@convert_type
+def map_gtall(data, sc):
+    return data > max(sc._col2_)
+
+
+@convert_type
+def map_gtany(data, sc):
+    return data > min(sc._col2_)
+
+
+@convert_type
+def map_gteall(data, sc):
+    return data >= max(sc._col2_)
+
+
+@convert_type
+def map_gteany(data, sc):
+    return data >= min(sc._col2_)
+
+
 def map_or(data, sc):
     col1 = sc._col1_
     col2 = sc._col2_
-    return PCMP_MAP[col1._operator_](data, col1) | PCMP_MAP[col2._operator_](data, col2)
+    return select2pandas(data, col1) | select2pandas(data, col2)
 
 
 def map_and(data, sc):
     col1 = sc._col1_
     col2 = sc._col2_
-    return PCMP_MAP[col1._operator_](data, col1) & PCMP_MAP[col2._operator_](data, col2)
+    return select2pandas(data, col1) & select2pandas(data, col2)
 
 
 def map_not(data, sc):
     col1 = sc._col1_
     col2 = sc._col2_
-    return ~ PCMP_MAP[col1._operator_](data, col1)
+    return ~ select2pandas(data, col1)
 
 
 @convert_type
@@ -105,6 +126,15 @@ def map_like(data, sc):
                 return data.str.contains(s)
     return data == s
 
+def map_notlike(data, sc):
+    return ~ map_like(data, sc)
+
+def map_null(data, sc):
+    return data.isna()
+
+def map_notnull(data, sc):
+    return data.notna()
+
 
 PCMP_MAP = {
     # binary numeric/str value comparison
@@ -120,6 +150,10 @@ PCMP_MAP = {
     CMP.LT: map_lt,
     CMP.LESSTHANOREQUAL: map_lte,
     CMP.LTE: map_lte,
+    CMP.GTALL: map_gtall,
+    CMP.GTEALL: map_gteall,
+    CMP.GTANY: map_gtany,
+    CMP.GTEANY: map_gteany,
 
     # logical operator
     CMP.OR: map_or,
@@ -130,7 +164,16 @@ PCMP_MAP = {
     CMP.IN: map_in,
 
     CMP.LIKE: map_like,
+    CMP.NOTLIKE: map_notlike,
+
+    CMP.NULL: map_null,
+    CMP.NOTNULL: map_notnull
 }
+
+
+def select2pandas(data, sc):
+    PCMP_MAP[sc._operator_](data, sc)
+
 
 PJOIN_MAP = {
     JOIN.INNER_JOIN: 'inner',
@@ -154,19 +197,44 @@ def fop2pandas(data1, data2, op):
         return -data1
     if op == F.OP.YEAR:
         ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
-        return ndata.dt.year
+        return ndata.dt.year.astype('int32')
     if op == F.OP.MONTH:
         ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
-        return ndata.dt.month
+        return ndata.dt.month.astype('int32')
     if op == F.OP.DAY:
         ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
-        return ndata.dt.day
+        return ndata.dt.day.astype('int32')
     return data1
 
 
 def f2pandas(data, f):
+    """
+
+    @param data: Entire data stored in transform or tabularData
+    @param f: F class
+    @return: Output column
+    """
     cols = [f._col1_, f._col2_]
     logging.info(f"col1: {cols[0]}, col2: {cols[1]}")
+
+    if isinstance(f, SUBSTRING):
+        col = f._col1_
+        start = max(0, f._fromidx_- 1) # to have the same behavior as SQL
+        length = f._len_
+        # clamp the start index to 0 if negative, and clamp the stop index to at least start index
+        # to avoid negative number
+        logging.info(f'In side substring: {col}-{start}-{length}')
+        return data[col].str[start:max(start + length, start)]
+    elif isinstance(f, CASE):
+        # initialize the output column with the default value
+        output = pd.DataFrame(f._deflt_._val_, index=data.index, columns=['output'])
+        for (case, val) in f._cases_:
+            logging.info(f'F Case |||||| case: {case}: {type(case)}, val: {val}: {type(val)}, op={case._operator_}')
+            # update the output column based on Q conditions
+            cond = PCMP_MAP[case._operator_](data, case)
+            output[cond] = val
+            logging.info(f"after case: cond = {cond.head(10)}, output={output.head(10)}")
+        return output
     for i in range(len(cols)):
         if isinstance(cols[i], F):
             logging.info(f"IS F")

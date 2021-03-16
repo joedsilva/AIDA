@@ -420,7 +420,7 @@ class SQLProjectionTransform(SQLTransform):
         # proj_cols is the final columns selected
 
         assign_params, rename_params = {}, {}
-        proj_cols = []
+        proj_cols = set()
 
         for c in self.__projcols__:
             if (isinstance(c, dict)):  # check if the projected column is given an alias name
@@ -434,12 +434,12 @@ class SQLProjectionTransform(SQLTransform):
                 items = [f'{key}: {val}' for key, val in sc1.__dict__.items()]
                 logging.info(', '.join(items))
 
-            if isinstance(sc1, str):
-                proj_cols.append(sc1) # select original column first
+            if isinstance(sc1, str): # case {'col'} or {'col': 'new col'}
+                proj_cols.add(sc1) # select original column first
                 if sc1 != pc1:
                     rename_params[sc1] = pc1 # then rename it
             else:
-                proj_cols.append(pc1)
+                proj_cols.add(pc1) # case F class
                 assign_params[pc1] = f2pandas(data, sc1)
 
         # get all columns required, and do computation on columns if needed
@@ -1498,6 +1498,7 @@ class DataFrame(TabularData):
         self.__shape__ = None;
         self.__matrix__ = None;
         self.__tableUDFExists__ = False;
+        self.__pdData__ = None
 
         self.__tableName__ = name if(name) else ('_tmp_' + re.sub(r'x','', str(uuid.uuid4())[:8])  ) ;
         self.__dbc__ = dbc;
@@ -1666,6 +1667,7 @@ class DataFrame(TabularData):
             #logging.debug("DataFrame: {} : rows called, need to produce data.".format(self.tableName));
             if(self.isDBQry):
                 data = self.execute_pandas()
+                self.pdData = data
                 if data is None:
                     logging.info(f'[{time.ctime()}]Generating data by _genSQL,')
                     (data, rows) = self.dbc._executeQry(self._genSQL_(doOrder=True).sqlText + ';');
