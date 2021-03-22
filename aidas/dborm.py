@@ -68,9 +68,11 @@ class SQLTransform(Transform):
     def genSQL(self):pass;
 
     #assume data is already loaded from the db into the memory
-    def execute_pandas(self):pass
+    def execute_pandas(self): pass
 
-
+    def get_data(self):
+        data = self._source_.__pdData__ if self._source_.__pdData__ else self._source_.execute_pandas()
+        return data
 
 class SQLSelectTransform(SQLTransform):
 
@@ -80,7 +82,7 @@ class SQLSelectTransform(SQLTransform):
 
     def execute_pandas(self):
         conditions = None
-        data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
+        data = self._source_.__pdData__ if self._source_.__pdData__ else self._source_.execute_pandas()
         #logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
 
         #convert ordered dict to pandas df
@@ -179,8 +181,8 @@ class SQLJoinTransform(SQLTransform):
         return self.__columns__;
 
     def execute_pandas(self):
-        data1 = self._source1_.__data__ if self._source1_.__data__ else self._source1_.execute_pandas()
-        data2 = self._source2_.__data__ if self._source2_.__data__ else self._source2_.execute_pandas()
+        data1 = self._source1_.__pdData__ if self._source1_.__pdData__ else self._source1_.execute_pandas()
+        data2 = self._source2_.__pdData__ if self._source2_.__pdData__ else self._source2_.execute_pandas()
         #logging.info(f'[{time.ctime()}] execute join pandas, data1 type = {type(data1)}')
         #logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
         #logging.info(f'column info: {self.columns}')
@@ -322,7 +324,7 @@ class SQLAggregateTransform(SQLTransform):
 
     def execute_pandas(self):
         # todo: no given name and *
-        data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
+        data = self._source_.__pdData__ if self._source_.__pdData__ else self._source_.execute_pandas()
         #convert ordered dict to pandas df
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
@@ -455,7 +457,7 @@ class SQLProjectionTransform(SQLTransform):
 
     def execute_pandas(self):
         self.columns
-        data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
+        data = self._source_.__pdData__ if self._source_.__pdData__ else self._source_.execute_pandas()
         #logging.info(f'[{time.ctime()}] execute projection pandas, data type = {type(data)}')
 
         if not isinstance(data, pd.DataFrame):
@@ -1280,6 +1282,12 @@ class DBTable(TabularData):
     @property
     def isDBQry(self): return True;
 
+    def execute_pandas(self):
+        if not self.__pdData__:
+            data = pd.DataFrame(self.__data__)
+            self.__pdData__ = data
+        return self.__pdData__
+
     #@property
     def _genSQL_(self,rowNumbers=False, includeRowNum=False):
         cols = None;
@@ -1688,15 +1696,11 @@ class DataFrame(TabularData):
     def upstream_data_exist(self):
         #logging.info(f'[{time.ctime()}] Inside upstream_data_exists. Checking for data for {type(self)} {self}, has data = {self.__data__}, '
                      # f'source {self.__source__}, has type {type(self.__source__)}')
-        if self.__data__:
+        if self.__data__ is not None or self.__pdData__ is not None:
             return True
         elif isinstance(self.__source__, tuple):
             f1 = self.checkType(self.__source__[0])
             f2 = self.checkType(self.__source__[1])
-            if not f1:
-                logging(f'f1 False detected: {self.__source__[0]}')
-            if not f2:
-                logging(f'f2 False detected: {self.__source__[1]}')
             return f1 and f2
         else:
             return self.checkType(self.__source__)
@@ -1712,8 +1716,10 @@ class DataFrame(TabularData):
             if self.__transform__:
                 #logging.info(f'[{time.ctime()}] executePandasSql: is transform')
                 return self.__transform__.execute_pandas()
+            if self.__data__ and (self.__pdData__ is None):
+                self.__pdData__ = pd.DataFrame(self.__data__)
 
-            return self.__data__ or self.__source__.__data__
+            return self.__pdData__ if self.__pdData__ is not None else self.__source__.execute_pandas()
         return None
 
     @property
@@ -1731,6 +1737,7 @@ class DataFrame(TabularData):
                 #logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
                 #Convert the results to an ordered dictionary format.
                 if isinstance(data, pd.DataFrame):
+                    self.__pdData__ = data
                     #logging.info(f'Converting pd to dict, columns = {self.columns}')
                     data_ = collections.OrderedDict()
                     for c in self.columns:
