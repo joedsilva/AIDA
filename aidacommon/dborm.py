@@ -503,6 +503,9 @@ class AggregateSQLFunction(metaclass=ABCMeta):
     def genSQL(self):
         return self.__funcName__ + '(' +  ('DISTINCT ' if(self.__distinct__) else '') + self.__srcColName__ + ')';
 
+    def __str__(self):
+        return self.genSQL
+
 #Specific types of aggregation functions.
 class COUNT(AggregateSQLFunction):
     def __init__(self, srcColName, distinct=False):

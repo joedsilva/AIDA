@@ -13,7 +13,7 @@ import pandas as pd;
 from aidacommon.aidaConfig import AConfig, UDFTYPE;
 from aidacommon.dborm import *;
 from aidacommon.dbAdapter import DBC;
-from aidacommon.pamp import PCMP_MAP, f2pandas, PJOIN_MAP
+from aidacommon.pamp import PCMP_MAP, f2pandas, PJOIN_MAP, PAGG_MAP
 from aidacommon.utils import VirtualOrderedColumnsDict;
 
 #Simple wrapper class to encapsulate a query string.
@@ -294,6 +294,7 @@ class SQLAggregateTransform(SQLTransform):
                 srccol = sc1.sourceColumn if(isinstance(sc1, AggregateSQLFunction)) else sc1; #Get the name of the source column
                 #projection column alias name if specifed use it, otherwise dervice one from the function/source column names.
                 projcol = (pc1.funcName.lower() + '_' + (pc1.sourceColumn if(pc1.sourceColumn != '*') else '') ) if(isinstance(pc1, AggregateSQLFunction)) else pc1;
+                logging.info(f'[{time.ctime()}] Inside aggregate columns. \n sc1: {sc1}, <{type(sc1)}>, \nsc2: {pc1}, <{type(pc1)}>')
                 #The transformation function on the source column.
                 coltransform = sc1 if(isinstance(sc1, AggregateSQLFunction)) else None;
                 return (srccol, projcol, coltransform);
@@ -324,6 +325,56 @@ class SQLAggregateTransform(SQLTransform):
 
         return self.__columns__;
 
+    def execute_pandas(self):
+        # todo: no given name and *
+        data = self._source_.__data__ if self._source_.__data__ else self._source_.execute_pandas()
+        #convert ordered dict to pandas df
+        if not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame.from_dict(data)
+
+        self.columns
+        agg_params, rename_params = {}, {}
+        proj_cols = set()
+        group_cols = [g for g in self.__groupcols__]
+
+        for g in group_cols:
+            rename_params[(g, '')] = g
+
+        for col in self.__projcols__:
+            if isinstance(col, dict):
+                sc1 = list(col.keys())[0];  # get the source column name / function
+                pc1 = col.get(sc1);  # and the alias name for projection.
+            else:
+                sc1 = pc1 = col;
+
+            if isinstance(sc1, AggregateSQLFunction):
+                col_name = sc1.__srcColName__
+                dname, func = PAGG_MAP[sc1.__funcName__]
+                # use the count of groups to calculate COUNT(*)
+                if col_name == '*':
+                    col_name = group_cols[0]
+
+                if col_name in agg_params:
+                    agg_params[col_name].append(func)
+                else:
+                    agg_params[col_name] = [func]
+                rename_params[(col_name, dname)] = pc1
+            else:
+                rename_params[(sc1, '')] = pc1
+
+            proj_cols.add(pc1)
+
+        # aggregate
+        data = data.groupby(group_cols).agg(agg_params)
+        # handle index problem caused bu aggregate
+        data = data.reset_index()
+        data.columns = data.columns.to_flat_index()
+        if rename_params:
+            # data.rename(columns=rename_params, inplace=True)
+            data.rename(**{'columns': rename_params, 'inplace': True})
+        logging.info(f'Agg, pandas columns = {data.columns}, groups = {group_cols}, rename = {rename_params} \n {data.head(10)}')
+        return data[proj_cols]
+
     @property
     def genSQL(self):
 
@@ -332,6 +383,7 @@ class SQLAggregateTransform(SQLTransform):
             col = self.columns[c];
             projcoltxt = ((projcoltxt+', ') if(projcoltxt) else '')  +  ( (col.colTransform.genSQL if(col.colTransform) else col.sourceColumnName[0]) + ' AS ' + col.columnName);
 
+        logging.info(f'[{time.ctime()}] aggregate group info: {projcoltxt}')
         groupcoltxt=None;
         if(self.__groupcols__):
             for g in self.__groupcols__:
@@ -1180,6 +1232,7 @@ class DBTable(TabularData):
 
 
         self.__data__ = None;
+        self.__pdData__ = None
         self.__matrix__ = None;
         self.__rowNames__ = None;
         self.__numRows__ = None;

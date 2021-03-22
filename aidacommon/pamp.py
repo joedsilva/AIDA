@@ -183,6 +183,14 @@ PJOIN_MAP = {
     JOIN.FULL_OUTER_JOIN: 'outer'
 }
 
+PAGG_MAP = {
+    'COUNT': ('size', np.size),
+    'MAX': ('amax', np.max),
+    'MIN': ('amin', np.min),
+    'SUM': ('sum', np.sum),
+    'AVG': np.average
+}
+
 
 def fop2pandas(data1, data2, op):
     if op == F.OP.ADD:
