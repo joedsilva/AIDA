@@ -1284,7 +1284,10 @@ class DBTable(TabularData):
 
     def execute_pandas(self):
         if not self.__pdData__:
+            t0 = time()
             data = pd.DataFrame(self.__data__)
+            t1 = time()
+            logging.info(f'{self.tableName} convert time = {t1 - t0}')
             self.__pdData__ = data
         return self.__pdData__
 

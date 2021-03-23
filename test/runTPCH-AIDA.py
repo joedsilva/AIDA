@@ -57,7 +57,8 @@ with open('{}/time-AIDA.csv'.format(config.outputDir), 'a') as f:
         print('----------[ Query {0} ]----------'.format(q))
         t0 = time()
         r = getattr(tpchqueries, 'q' + q)(db)
-        r.loadData()
+        if(hasattr(r, '_genSQL_')):
+            r.loadData()
         t1 = time()
         if(hasattr(r, '_genSQL_')):
             print(r.rows)
