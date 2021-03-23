@@ -82,7 +82,7 @@ class SQLSelectTransform(SQLTransform):
 
     def execute_pandas(self):
         conditions = None
-        data = self._source_.__pdData__ if self._source_.__pdData__ else self._source_.execute_pandas()
+        data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
         #logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
 
         #convert ordered dict to pandas df
@@ -181,8 +181,8 @@ class SQLJoinTransform(SQLTransform):
         return self.__columns__;
 
     def execute_pandas(self):
-        data1 = self._source1_.__pdData__ if self._source1_.__pdData__ else self._source1_.execute_pandas()
-        data2 = self._source2_.__pdData__ if self._source2_.__pdData__ else self._source2_.execute_pandas()
+        data1 = self._source1_.__pdData__ if self._source1_.__pdData__ is not None else self._source1_.execute_pandas()
+        data2 = self._source2_.__pdData__ if self._source2_.__pdData__ is not None else self._source2_.execute_pandas()
         #logging.info(f'[{time.ctime()}] execute join pandas, data1 type = {type(data1)}')
         #logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
         #logging.info(f'column info: {self.columns}')
@@ -324,7 +324,7 @@ class SQLAggregateTransform(SQLTransform):
 
     def execute_pandas(self):
         # todo: no given name and *
-        data = self._source_.__pdData__ if self._source_.__pdData__ else self._source_.execute_pandas()
+        data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
         #convert ordered dict to pandas df
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
@@ -457,7 +457,7 @@ class SQLProjectionTransform(SQLTransform):
 
     def execute_pandas(self):
         self.columns
-        data = self._source_.__pdData__ if self._source_.__pdData__ else self._source_.execute_pandas()
+        data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
         #logging.info(f'[{time.ctime()}] execute projection pandas, data type = {type(data)}')
 
         if not isinstance(data, pd.DataFrame):
@@ -1726,15 +1726,15 @@ class DataFrame(TabularData):
     def rows(self):
         #logging.debug("DataFrame: id {}, {} : rows called.".format(id(self), self.tableName));
         if(self.__data__ is None):
-            #logging.info(f'[{time.ctime()}]No data available, transform = {self.__transform__}')
+            logging.info(f'[{time.ctime()}]No data available, transform = {self.__transform__}')
             #logging.debug("DataFrame: {} : rows called, need to produce data.".format(self.tableName));
             if(self.isDBQry):
                 data = self.execute_pandas()
                 self.pdData = data
                 if data is None:
-                    #logging.info(f'[{time.ctime()}]Generating data by _genSQL,')
+                    logging.info(f'[{time.ctime()}]Generating data by _genSQL,')
                     (data, rows) = self.dbc._executeQry(self._genSQL_(doOrder=True).sqlText + ';');
-                #logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
+                logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
                 #Convert the results to an ordered dictionary format.
                 if isinstance(data, pd.DataFrame):
                     self.__pdData__ = data
