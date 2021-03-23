@@ -188,7 +188,7 @@ PAGG_MAP = {
     'MAX': ('amax', np.max),
     'MIN': ('amin', np.min),
     'SUM': ('sum', np.sum),
-    'AVG': np.average
+    'AVG': ('average', np.average)
 }
 
 

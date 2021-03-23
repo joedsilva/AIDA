@@ -47,7 +47,6 @@ order by
          , {AVG('l_discount'): 'avg_disc'}
          , {COUNT('*'): 'count_order'})
         , ('l_returnflag', 'l_linestatus'));
-    l = l.order(('l_returnflag','l_linestatus'));
 
     return l;
 
