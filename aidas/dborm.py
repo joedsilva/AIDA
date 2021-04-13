@@ -5,15 +5,14 @@ import re;
 import copy;
 import uuid;
 
-import logging;
+#from guppy import hpy
 
-import numpy as np;
 import pandas as pd;
 
 from aidacommon.aidaConfig import AConfig, UDFTYPE;
 from aidacommon.dborm import *;
 from aidacommon.dbAdapter import DBC;
-from aidacommon.pamp import PCMP_MAP, f2pandas, PJOIN_MAP, PAGG_MAP
+from aidas.pamp import *
 from aidacommon.utils import VirtualOrderedColumnsDict;
 
 #Simple wrapper class to encapsulate a query string.
@@ -83,33 +82,33 @@ class SQLSelectTransform(SQLTransform):
     def execute_pandas(self):
         conditions = None
         data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
-        #logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
+        logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
 
         #convert ordered dict to pandas df
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
 
         for sc in self.__selcols__:
-            #logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
-            #logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
+            logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
+            logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
             operator = sc._operator_
             if conditions is None:
-                conditions = PCMP_MAP[operator](data, sc)
+                conditions = select2pandas(data, sc)
             else:
-                conditions = conditions & PCMP_MAP[operator](data, sc)
+                conditions = conditions & select2pandas(data, sc)
 
         data = data[conditions]
-        #logging.info(f'[{time.ctime()}] executed pandas select, condition = {conditions}, data = {data.head(3)}')
+        logging.info(f'[{time.ctime()}] executed pandas select, condition = {conditions}, data = {data.head(3)}')
 
         return data
 
     @property
     def genSQL(self):
-        #logging.info(f'[{time.ctime()}] generating sql for SQLSelectTransform {self.__selcols__}, source type: {self._source_}')
+        logging.info(f'[{time.ctime()}] generating sql for SQLSelectTransform {self.__selcols__}, source type: {self._source_}')
         selCondition = '';
         for sc in self.__selcols__: #iterate through the filter conditions.
-            #logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
-            #logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
+            logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
+            logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
             srccollist = sc.srcColList; #get the source columns list involved in each one.
             for s in srccollist:
                 c=self._source_.columns.get(s) #check if the columns are present in the source
@@ -126,7 +125,7 @@ class SQLSelectTransform(SQLTransform):
                          '(' + (self._source_.genSQL.sqlText) + ') ' + self._source_.tableName +
                       ' WHERE ' + selCondition
                     );
-        #logging.info(f"{time.ctime()}] Generated selection sql: \"{sqlText}\"")
+        logging.info(f"{time.ctime()}] Generated selection sql: \"{sqlText}\"")
         return SQLQuery(sqlText);
 
 
@@ -183,9 +182,9 @@ class SQLJoinTransform(SQLTransform):
     def execute_pandas(self):
         data1 = self._source1_.__pdData__ if self._source1_.__pdData__ is not None else self._source1_.execute_pandas()
         data2 = self._source2_.__pdData__ if self._source2_.__pdData__ is not None else self._source2_.execute_pandas()
-        #logging.info(f'[{time.ctime()}] execute join pandas, data1 type = {type(data1)}')
+        logging.info(f'[{time.ctime()}] execute join pandas, data1 = {data1.head()}, \n data2 = {data2.head()} \n -----------------------------------\n '
+                     f'query = {self.genSQL} \n -------------------------- -----------\n')
         #logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
-        #logging.info(f'column info: {self.columns}')
         #convert ordered dict to pandas df
         if not isinstance(data1, pd.DataFrame):
             data1 = pd.DataFrame.from_dict(data1)
@@ -193,12 +192,14 @@ class SQLJoinTransform(SQLTransform):
             data2 = pd.DataFrame.from_dict(data2)
 
         proj_cols = [c.columnName if not isinstance(c, str) else c for c in self.columns]
+        logging.info(f'column info: {self.columns} \n proj_cols = {proj_cols} \n, data1 columns= {data1.columns}, \n data2 = {data2.columns}')
         if self._jointype_ == JOIN.CROSS_JOIN:
-            return data1.merge(data2, how='cross')[proj_cols]
+            data = data1.merge(data2, how='cross')
+            return data[proj_cols]
         else:
-            return pd.merge(data1, data2, left_on=self._src1joincols_, right_on=self._src2joincols_,
-                            how=PJOIN_MAP[self._jointype_])[proj_cols]
-
+            data = pd.merge(data1, data2, left_on=self._src1joincols_, right_on=self._src2joincols_,
+                            how=PJOIN_MAP[self._jointype_])
+            return data[proj_cols]
 
     @property
     def genSQL(self):
@@ -332,10 +333,21 @@ class SQLAggregateTransform(SQLTransform):
         self.columns
         agg_params, rename_params = {}, {}
         proj_cols = set()
-        group_cols = [g for g in self.__groupcols__]
+        group_cols = []
+        if self.__groupcols__:
+            for g in self.__groupcols__:
+                rename_params[(g, '')] = g
+                group_cols.append(g)
 
-        for g in group_cols:
-            rename_params[(g, '')] = g
+        logging.info(
+            f'self column info: {self.columns} \n group_cols = {group_cols} \n, data columns= {data.columns}, \n data = {data.head()}')
+        # get groupbyDataframe
+        if group_cols:
+            data = data.groupby(group_cols)
+        else:
+            # group on entire dataset
+            data = data.groupby(lambda _: True)
+        count_col = None
 
         for col in self.__projcols__:
             if isinstance(col, dict):
@@ -347,29 +359,42 @@ class SQLAggregateTransform(SQLTransform):
             if isinstance(sc1, AggregateSQLFunction):
                 col_name = sc1.__srcColName__
                 dname, func = PAGG_MAP[sc1.__funcName__]
-                # use the count of groups to calculate COUNT(*)
+                # calculate COUNT(*) by the size of group dataframe directly
                 if col_name == '*':
-                    col_name = group_cols[0]
-
-                if col_name in agg_params:
-                    agg_params[col_name].append(func)
+                    count_col = data.size()
+                    rename_params[('_count', '')] = pc1
+                    rename_params['_count'] = pc1
+                # other aggregation operation/ has a specific column
                 else:
-                    agg_params[col_name] = [func]
-                rename_params[(col_name, dname)] = pc1
+                    if col_name in agg_params:
+                        agg_params[col_name].append(func)
+                    else:
+                        agg_params[col_name] = [func]
+                    rename_params[(col_name, dname)] = pc1
             else:
                 rename_params[(sc1, '')] = pc1
+                rename_params[sc1] = pc1
 
             proj_cols.add(pc1)
 
         # aggregate
-        data = data.groupby(group_cols).agg(agg_params)
-        # handle index problem caused bu aggregate
+        if agg_params:
+            data = data.agg(agg_params)
+            # add the count column if there is operation COUNT(*)
+        else:
+            # dummy operation, to get pd.dateframe object
+            data = data.count()
+
+        if count_col is not None:
+            data = data.assign(_count=count_col)
+        # handle 2D index caused by aggregation
+        # move group by columns from index to data column
         data = data.reset_index()
         data.columns = data.columns.to_flat_index()
         if rename_params:
             # data.rename(columns=rename_params, inplace=True)
             data.rename(**{'columns': rename_params, 'inplace': True})
-        #logging.info(f'Agg pandas, pandas columns = {data.columns}, groups = {group_cols}, rename = {rename_params} \n {data.head(10)}')
+        logging.info(f'Agg pandas, pandas columns = {data.columns}, proj_col = {proj_cols}, groups = {group_cols}, rename = {rename_params} \n {data.head(10)}')
         return data[proj_cols]
 
     @property
@@ -458,7 +483,8 @@ class SQLProjectionTransform(SQLTransform):
     def execute_pandas(self):
         self.columns
         data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
-        #logging.info(f'[{time.ctime()}] execute projection pandas, data type = {type(data)}')
+        logging.info(f'[{time.ctime()}] execute projection pandas, data = {data.columns}, type = {data.dtypes}\n--------------------------\n '
+                     f'sql = {self.genSQL} \n--------------------------\n')
 
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
@@ -493,12 +519,11 @@ class SQLProjectionTransform(SQLTransform):
 
         # get all columns required, and do computation on columns if needed
         data = data.assign(**assign_params)[proj_cols] if assign_params else data[proj_cols]
-        #logging.info(f'{time.ctime()} proj_cols: {proj_cols} \n rename_param: {rename_params} \n assign_param: {assign_params}')
+        logging.info(f'{time.ctime()} proj_cols: {proj_cols} \n rename_param: {rename_params} \n assign_param: {assign_params}')
         #rename columns if required
         if rename_params:
-            # data.rename(columns=rename_params, inplace=True)
-            data = data.rename(**{'columns': rename_params, 'inplace': True})
-
+            data.rename(**{'columns': rename_params, 'inplace': True})
+        logging.info(f"Projection result = {data}, type = {data.dtypes}")
         return data
 
 
@@ -520,6 +545,33 @@ class SQLOrderTransform(SQLTransform):
     def __init__(self, source, orderlist):
         super().__init__(source);
         self._colorderlist_ = orderlist;
+
+    def execute_pandas(self, doOrder=True):
+        data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
+        logging.info(f'[{time.ctime()}] execute order pandas, data type = {type(data)}')
+        if not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame.from_dict(data)
+
+        if (not doOrder):
+            return data
+        else:
+            colorderlist = [self._colorderlist_] if(isinstance(self._colorderlist_, str)) else self._colorderlist_;
+            logging.info(f'order vars: {colorderlist}')
+            sortcol = []
+            sortascend = []
+            for ocol in colorderlist:
+                if(ocol.endswith('#asc')):
+                    sortcol.append(ocol[:-4]);
+                    sortascend.append(True)
+                elif(ocol.endswith('#desc')):
+                    sortcol.append(ocol[:-5] )
+                    sortascend.append(False)
+                else:
+                    sortcol.append(ocol);
+                    sortascend.append(True)
+            logging.info(f'sort col = {sortcol}, sortascend = {sortascend}')
+            data = data.sort_values(by=sortcol, ascending=sortascend)
+            return data
 
     def _genSQL_(self, doOrder=False):
         if(not doOrder):
@@ -1283,7 +1335,7 @@ class DBTable(TabularData):
     def isDBQry(self): return True;
 
     def execute_pandas(self):
-        if not self.__pdData__:
+        if self.__pdData__ is None:
             t0 = time.time()
             data = pd.DataFrame(self.__data__)
             t1 = time.time()
@@ -1697,8 +1749,8 @@ class DataFrame(TabularData):
     genSQL = property(_genSQL_);
 
     def upstream_data_exist(self):
-        #logging.info(f'[{time.ctime()}] Inside upstream_data_exists. Checking for data for {type(self)} {self}, has data = {self.__data__}, '
-                     # f'source {self.__source__}, has type {type(self.__source__)}')
+        logging.info(f'[{time.ctime()}] Inside upstream_data_exists. Checking for data for {type(self)} {self}, has data = {self.__data__}, '
+                      f'source {self.__source__}, has type {type(self.__source__)}')
         if self.__data__ is not None or self.__pdData__ is not None:
             return True
         elif isinstance(self.__source__, tuple):
@@ -1710,16 +1762,16 @@ class DataFrame(TabularData):
 
     def checkType(self, source):
         if isinstance(source, DBTable):
-            return True if source.__data__ else False
+            return True if source.__data__ is not None else False
         if isinstance(source, DataFrame):
             return source.upstream_data_exist()
 
     def execute_pandas(self):
         if self.upstream_data_exist():
-            if self.__transform__:
+            if self.__transform__ is not None:
                 #logging.info(f'[{time.ctime()}] executePandasSql: is transform')
                 return self.__transform__.execute_pandas()
-            if self.__data__ and (self.__pdData__ is None):
+            if self.__data__ is not None and (self.__pdData__ is None):
                 self.__pdData__ = pd.DataFrame(self.__data__)
 
             return self.__pdData__ if self.__pdData__ is not None else self.__source__.execute_pandas()
@@ -1796,7 +1848,7 @@ class DataFrame(TabularData):
             self.__source__ = self.__transform__ = None;
 
         #logging.debug("DataFrame: id {}, {} : returning rows.".format(id(self), self.tableName));
-        #logging.info(f'DataFrame: id {id(self)}, {self.tableName} : returning rows. __data__ type : {type(self.__data__)}');
+        #logging.info(f'Generate memory usage: {hpy().heap()}');
         return self.__data__;
 
     @property

@@ -6,21 +6,25 @@ import numpy as np
 
 from aidacommon.dborm import CMP, DATE, Q, F, C, EXTRACT, JOIN, SUBSTRING, CASE
 
-
 def convert_type(func):
     def inner(data, sc):
         # when condition type is date
+        from aidas.dborm import DataFrame
         if isinstance(sc._col2_, DATE):
             ndata = pd.to_datetime(data[sc._col1_], format='%Y-%m-%d', errors='coerce')
             sc = Q(sc._col1_, sc._col2_.__date__, sc._operator_)
         elif isinstance(sc._col2_, C):
             ndata = data[sc._col1_]
             sc = Q(sc._col1_, sc._col2_._val_, sc._operator_)
+        elif isinstance(sc._col2_, DataFrame):
+            ndata = data[sc._col1_]
+            sc = Q(sc._col1_, sc._col2_.execute_pandas(), sc._operator_)
         else:
             ndata = data[sc._col1_]
-        #logging.info(
-            # f'PAMP after converting: data={ndata.head(10)}, sc.col1={sc._col1_}, <{ndata[0]}: {type(ndata[0])}, '
-            # f'col2={sc._col2_}, type: {type(sc._col2_)}')
+            ndata.astype(type(sc._col2_))
+        logging.info(
+            f'PAMP after converting: data={ndata.head(10)}, sc.col1={sc._col1_}, <{ndata[0]}: {type(ndata[0])}, '
+            f'col2={sc._col2_}, type: {type(sc._col2_)}')
         return func(ndata, sc)
 
     return inner
@@ -75,6 +79,25 @@ def map_gteall(data, sc):
 def map_gteany(data, sc):
     return data >= min(sc._col2_)
 
+@convert_type
+def map_ltall(data, sc):
+    return data < min(sc._col2_)
+
+
+@convert_type
+def map_ltany(data, sc):
+    return data > max(sc._col2_)
+
+
+@convert_type
+def map_lteall(data, sc):
+    return data <= min(sc._col2_)
+
+
+@convert_type
+def map_lteany(data, sc):
+    return data <= max(sc._col2_)
+
 
 def map_or(data, sc):
     col1 = sc._col1_
@@ -96,13 +119,16 @@ def map_not(data, sc):
 
 @convert_type
 def map_in(data, sc):
-    #logging.info(f'MAP_IN: data: {data.head(10)}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
-    return data.isin(sc._col2_)
+    ls = sc._col2_
+    logging.info(f'MAP_IN: data: {data.head(10)}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
+    return data.isin(ls)
 
 
 @convert_type
 def map_notin(data, sc):
-    return data.isnotin(sc._col2_)
+    ls = sc._col2_
+    logging.info(f'MAP_NOTIN: data: {data.head(10)}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
+    return ~data.isin(ls)
 
 
 MATCH_PATTERNS = ['^%([^%]+)$', '^([^%]+)%$', '^%([^%]+)%$']
@@ -142,6 +168,7 @@ PCMP_MAP = {
     CMP.EQUAL: map_eq,
     CMP.NOTEQUAL: map_ne,
     CMP.NE: map_ne,
+
     CMP.GREATERTHAN: map_gt,
     CMP.GT: map_gt,
     CMP.GREATERTHANOREQUAL: map_gte,
@@ -154,6 +181,10 @@ PCMP_MAP = {
     CMP.GTEALL: map_gteall,
     CMP.GTANY: map_gtany,
     CMP.GTEANY: map_gteany,
+    CMP.LTALL: map_ltall,
+    CMP.LTEALL: map_lteall,
+    CMP.LTANY: map_ltany,
+    CMP.LTEANY: map_lteany,
 
     # logical operator
     CMP.OR: map_or,
@@ -162,17 +193,23 @@ PCMP_MAP = {
 
     # subquery
     CMP.IN: map_in,
+    CMP.NOTIN: map_notin,
+    CMP.EXISTS: None,
+    CMP.NOTEXISTS: None,
 
     CMP.LIKE: map_like,
     CMP.NOTLIKE: map_notlike,
 
     CMP.NULL: map_null,
-    CMP.NOTNULL: map_notnull
+    CMP.NL: map_null,
+    CMP.NOTNULL: map_notnull,
+    CMP.NNL: map_notnull
 }
 
 
 def select2pandas(data, sc):
-    PCMP_MAP[sc._operator_](data, sc)
+    filter_func = PCMP_MAP.get(sc._operator_, map_eq)
+    return filter_func(data , sc)
 
 
 PJOIN_MAP = {
@@ -223,7 +260,7 @@ def f2pandas(data, f):
     @return: Output column
     """
     cols = [f._col1_, f._col2_]
-    #logging.info(f"col1: {cols[0]}, col2: {cols[1]}")
+    logging.info(f"f2pandas col1: {cols[0]}, col2: {cols[1]}")
 
     if isinstance(f, SUBSTRING):
         col = f._col1_
@@ -235,7 +272,8 @@ def f2pandas(data, f):
         return data[col].str[start:max(start + length, start)]
     elif isinstance(f, CASE):
         # initialize the output column with the default value
-        output = pd.DataFrame(f._deflt_._val_, index=data.index, columns=['output'])
+        defval = f._deflt_._val_ if hasattr(f._deflt_, '_val_') else f._deflt_
+        output = pd.DataFrame(defval, index=data.index, columns=['output'])
         for (case, val) in f._cases_:
             #logging.info(f'F Case |||||| case: {case}: {type(case)}, val: {val}: {type(val)}, op={case._operator_}')
             # update the output column based on Q conditions
@@ -249,5 +287,5 @@ def f2pandas(data, f):
             cols[i] = f2pandas(data, cols[i])
         elif isinstance(cols[i], str):
             cols[i] = data[cols[i]]
-    #logging.info(f"after: col1: {cols[0]}, col2: {cols[1]}")
+    logging.info(f"f2pandas after: col1: {cols[0]}, col2: {cols[1]}")
     return fop2pandas(cols[0], cols[1], f._operator_)

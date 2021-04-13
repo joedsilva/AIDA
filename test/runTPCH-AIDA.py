@@ -1,6 +1,7 @@
 import sys
 import os
 from time import time
+#from memory_profiler import profile
 
 config = __import__('TPCHconfig-AIDA')
 tpchqueries = __import__('TPCHqueries-AIDA')
@@ -50,19 +51,22 @@ else:
     db2 = db
 
 
+#@profile
+def run_test():
+    with open('{}/time-AIDA.csv'.format(config.outputDir), 'a') as f:
+        for q in queries:
+            print('----------[ Query {0} ]----------'.format(q))
+            t0 = time()
+            r = getattr(tpchqueries, 'q' + q)(db)
+            if(hasattr(r, '_genSQL_')):
+                r.loadData()
+            t1 = time()
+            if(hasattr(r, '_genSQL_')):
+                print(r.rows)
+            else:
+                print(r)
+            print('Executing query took {}s'.format(t1 - t0))
+            f.write('{0},{1}\n'.format(int(q), t1 - t0))
 
 
-with open('{}/time-AIDA.csv'.format(config.outputDir), 'a') as f:
-    for q in queries:
-        print('----------[ Query {0} ]----------'.format(q))
-        t0 = time()
-        r = getattr(tpchqueries, 'q' + q)(db)
-        if(hasattr(r, '_genSQL_')):
-            r.loadData()
-        t1 = time()
-        if(hasattr(r, '_genSQL_')):
-            print(r.rows)
-        else:
-            print(r)
-        print('Executing query took {}s'.format(t1 - t0))
-        f.write('{0},{1}\n'.format(int(q), t1 - t0))
+run_test()

@@ -47,6 +47,7 @@ order by
          , {AVG('l_discount'): 'avg_disc'}
          , {COUNT('*'): 'count_order'})
         , ('l_returnflag', 'l_linestatus'));
+    l = l.order(('l_returnflag', 'l_linestatus'));
 
     return l;
 
@@ -321,6 +322,7 @@ order by
     t = t.join(r, ('n_regionkey',), ('r_regionkey',), COL.ALL, COL.ALL);
     t = t.project(('n_name', {F('l_extendedprice')*(1-F('l_discount')):'rev'}))
     t = t.aggregate(('n_name', {SUM('rev'):'revenue'}), ('n_name',));
+    t = t.order('revenue#desc');
 
     return t;
 
@@ -600,6 +602,7 @@ limit 20;
     t = t.join(n, ('c_nationkey',), ('n_nationkey',), COL.ALL, COL.ALL);
     t = t.aggregate(('c_custkey', 'c_name', {SUM('rev'):'revenue'}, 'c_acctbal', 'n_name', 'c_address', 'c_phone', 'c_comment'),
                     ('c_custkey', 'c_name', 'c_acctbal', 'c_phone', 'n_name', 'c_address', 'c_comment'));
+    t = t.order(('revenue#desc',));
     t = t.head(20);
 
     return t;
