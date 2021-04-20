@@ -21,7 +21,7 @@ def convert_type(func):
             col2 = sc._col2_.execute_pandas()
             # todo: need to make sure if col2 can get size other than 1 or data.size
             # if there is only one element in col2, then we compare data with that element
-            col2 = col2 if col2.size > 1 else col2.iloc[0, 0]
+            col2 = col2.iloc[0, 0] if col2.size == 1 else col2
             sc = Q(sc._col1_, col2, sc._operator_)
         elif isinstance(sc._col2_, str):
             ndata = data[sc._col1_]
