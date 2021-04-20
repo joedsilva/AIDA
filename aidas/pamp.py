@@ -18,7 +18,11 @@ def convert_type(func):
             sc = Q(sc._col1_, sc._col2_._val_, sc._operator_)
         elif isinstance(sc._col2_, DataFrame):
             ndata = data[sc._col1_]
-            sc = Q(sc._col1_, sc._col2_.execute_pandas(), sc._operator_)
+            col2 = sc._col2_.execute_pandas()
+            # todo: need to make sure if col2 can get size other than 1 or data.size
+            # if there is only one element in col2, then we compare data with that element
+            col2 = col2 if col2.size > 1 else col2.iloc[0, 0]
+            sc = Q(sc._col1_, col2, sc._operator_)
         elif isinstance(sc._col2_, str):
             ndata = data[sc._col1_]
             sc = Q(sc._col1_, data[sc._col2_], sc._operator_)
@@ -34,32 +38,32 @@ def convert_type(func):
 
 @convert_type
 def map_eq(data, sc):
-    return data == sc._col2_
+    return np.where(data == sc._col2_, True, False)
 
 
 @convert_type
 def map_ne(data, sc):
-    return data != sc._col2_
+    return np.where(data != sc._col2_, True, False)
 
 
 @convert_type
 def map_gt(data, sc):
-    return data > sc._col2_
+    return np.where(data > sc._col2_, True, False)
 
 
 @convert_type
 def map_gte(data, sc):
-    return data >= sc._col2_
+    return np.where(data >= sc._col2_, True, False)
 
 
 @convert_type
 def map_lt(data, sc):
-    return data < sc._col2_
+    return np.where(data < sc._col2_, True, False)
 
 
 @convert_type
 def map_lte(data, sc):
-    return data <= sc._col2_
+    return np.where(data <= sc._col2_, True, False)
 
 
 @convert_type
@@ -124,15 +128,13 @@ def map_in(data, sc):
     #change from pd.Dataframe to 1D ndarray
     if isinstance(sc._col2_, pd.DataFrame):
         sc._col2_ = sc._col2_.values.ravel()
-    logging.info(f'MAP_IN: data: {data}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
+        logging.info(f'MAP_IN: data: {data}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
+        return data.isin(sc._col2_).squeeze()
     return data.isin(sc._col2_)
 
 
-@convert_type
 def map_notin(data, sc):
-    ls = sc._col2_
-    logging.info(f'MAP_NOTIN: data: {data.head(10)}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
-    return ~data.isin(ls)
+    return ~map_in(data, sc)
 
 
 MATCH_PATTERNS = ['^%([^%]+)$', '^([^%]+)%$', '^%([^%]+)%$']
