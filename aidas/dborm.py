@@ -206,8 +206,10 @@ class SQLJoinTransform(SQLTransform):
         rename_params.update(self.get_rename_cols(self._src2projcols_))
 
         proj_cols = [c.columnName if not isinstance(c, str) else c for c in self.__columns__]
-        logging.info(f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, data1 columns= {data1.columns}, \n data2 = {data2.columns}')
         if self._jointype_ == JOIN.CROSS_JOIN:
+            logging.info(
+                f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, '
+                f'data1 columns= {data1.columns}, \n data2 = {data2.columns}')
             data1['_key'] = 0
             data2['_key'] = 0
             data = data1.merge(data2, on='_key')

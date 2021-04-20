@@ -284,13 +284,15 @@ def f2pandas(data, f):
     elif isinstance(f, CASE):
         # initialize the output column with the default value
         defval = f._deflt_._val_ if hasattr(f._deflt_, '_val_') else f._deflt_
-        output = pd.DataFrame(defval, index=data.index, columns=['output'])
+        output = pd.DataFrame(defval, index=data.index, columns=['_output'])
         for (case, val) in f._cases_:
-            #logging.info(f'F Case |||||| case: {case}: {type(case)}, val: {val}: {type(val)}, op={case._operator_}')
+            logging.info(f'F Case |||||| case: {case}: {type(case)}, val: {val}: {type(val)}, op={case._operator_}')
+            if isinstance(val, F):
+                val = f2pandas(data, val)
             # update the output column based on Q conditions
             cond = PCMP_MAP[case._operator_](data, case)
-            output[cond] = val
-            #logging.info(f"after case: cond = {cond.head(10)}, output={output.head(10)}")
+            output['_output'] = np.where(cond, val, output['_output'])
+            logging.info(f"after case: cond = {cond}, val = {val}, output={output}")
         return output
     for i in range(len(cols)):
         if isinstance(cols[i], F):
@@ -298,5 +300,7 @@ def f2pandas(data, f):
             cols[i] = f2pandas(data, cols[i])
         elif isinstance(cols[i], str):
             cols[i] = data[cols[i]]
+        else:
+            cols[i] = cols[i]
     logging.info(f"f2pandas after: col1: {cols[0]}, col2: {cols[1]}")
     return fop2pandas(cols[0], cols[1], f._operator_)
