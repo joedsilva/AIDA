@@ -121,9 +121,10 @@ def map_not(data, sc):
 
 @convert_type
 def map_in(data, sc):
-    logging.info(f'MAP_IN: data: {data}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
+    #change from pd.Dataframe to 1D ndarray
     if isinstance(sc._col2_, pd.DataFrame):
-        sc._col2_ = sc._col2_.values
+        sc._col2_ = sc._col2_.values.ravel()
+    logging.info(f'MAP_IN: data: {data}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
     return data.isin(sc._col2_)
 
 
