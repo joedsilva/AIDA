@@ -19,11 +19,13 @@ def convert_type(func):
         elif isinstance(sc._col2_, DataFrame):
             ndata = data[sc._col1_]
             sc = Q(sc._col1_, sc._col2_.execute_pandas(), sc._operator_)
+        elif isinstance(sc._col2_, str):
+            ndata = data[sc._col1_]
+            sc = Q(sc._col1_, data[sc._col2_], sc._operator_)
         else:
             ndata = data[sc._col1_]
-            ndata.astype(type(sc._col2_))
         logging.info(
-            f'PAMP after converting: data={ndata.head(10)}, sc.col1={sc._col1_}, <{ndata[0]}: {type(ndata[0])}, '
+            f'PAMP after converting: data={ndata.head(10)}, sc.col1={sc._col1_}, <data type: {data.dtypes}, '
             f'col2={sc._col2_}, type: {type(sc._col2_)}')
         return func(ndata, sc)
 
@@ -119,9 +121,10 @@ def map_not(data, sc):
 
 @convert_type
 def map_in(data, sc):
-    ls = sc._col2_
-    logging.info(f'MAP_IN: data: {data.head(10)}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
-    return data.isin(ls)
+    logging.info(f'MAP_IN: data: {data}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
+    if isinstance(sc._col2_, pd.DataFrame):
+        sc._col2_ = sc._col2_.values
+    return data.isin(sc._col2_)
 
 
 @convert_type
@@ -221,13 +224,20 @@ PJOIN_MAP = {
 }
 
 PAGG_MAP = {
-    'COUNT': ('size', np.size),
-    'MAX': ('amax', np.max),
-    'MIN': ('amin', np.min),
-    'SUM': ('sum', np.sum),
-    'AVG': ('average', np.average)
+    'COUNT': ('size', 'size_', np.size),
+    'MAX': ('amax', 'max_', np.max),
+    'MIN': ('amin', 'min_', np.min),
+    'SUM': ('sum', 'sum_', np.sum),
+    'AVG': ('average', 'average_', np.average)
 }
 
+
+def extract_src_col(s):
+    pattern = r".*\((.*)\).*"
+    rex = re.compile(pattern)
+    match = rex.match(s)
+    if match:
+        return match.group(1)
 
 def fop2pandas(data1, data2, op):
     if op == F.OP.ADD:
