@@ -1,3 +1,4 @@
+import pickle
 import sys
 import os
 from time import time
@@ -61,12 +62,16 @@ def run_test():
             if(hasattr(r, '_genSQL_')):
                 r.loadData()
             t1 = time()
-            if(hasattr(r, '_genSQL_')):
-                print(r.rows)
-            else:
-                print(r)
+
+            # dump data to expected result file
+            with open('{}/expected_{}'.format(config.outputDir, q), 'wb') as file:
+                if(hasattr(r, '_genSQL_')):
+                    print(r.rows)
+                    pickle.dump(r.rows, file)
+                else:
+                    print(r)
+                    pickle.dump(r, file)
             print('Executing query took {}s'.format(t1 - t0))
             f.write('{0},{1}\n'.format(int(q), t1 - t0))
-
 
 run_test()

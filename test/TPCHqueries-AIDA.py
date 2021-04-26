@@ -1054,6 +1054,9 @@ where
     """
     l = db.lineitem;
     p = db.part;
+    l = l.filter(Q('l_shipmode', ('AIR', 'AIR REG'), CMP.IN )
+                        & Q('l_shipinstruct', C('DELIVER IN PERSON')))
+    p = p.filter(Q('p_size', C(1), CMP.GTE))
     t = l.join(p, None, None, COL.ALL, COL.ALL, join=JOIN.CROSS_JOIN);
     t = t.filter(
                     (
@@ -1061,27 +1064,21 @@ where
                         & Q('p_brand', C('Brand#12'))
                         & Q('p_container', ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG'), CMP.IN)
                         & Q('l_quantity', C(1), CMP.GTE) & Q('l_quantity', C(11), CMP.LTE)
-                        & Q('p_size', C(1), CMP.GTE) & Q('p_size', C(5), CMP.LTE)
-                        & Q('l_shipmode', ('AIR', 'AIR REG'), CMP.IN )
-                        & Q('l_shipinstruct', C('DELIVER IN PERSON'))
+                        & Q('p_size', C(5), CMP.LTE)
                     ) |
                     (
                         Q('p_partkey', 'l_partkey')
                         & Q('p_brand', C('Brand#23'))
                         & Q('p_container', ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK'), CMP.IN)
                         & Q('l_quantity', C(10), CMP.GTE) & Q('l_quantity', C(20), CMP.LTE)
-                        & Q('p_size', C(1), CMP.GTE) & Q('p_size', C(10), CMP.LTE)
-                        & Q('l_shipmode', ('AIR', 'AIR REG'), CMP.IN )
-                        & Q('l_shipinstruct', C('DELIVER IN PERSON'))
+                        & Q('p_size', C(10), CMP.LTE)
                     ) |
                     (
                         Q('p_partkey', 'l_partkey')
                         & Q('p_brand', C('Brand#34'))
                         & Q('p_container', ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), CMP.IN)
                         & Q('l_quantity', C(20), CMP.GTE) & Q('l_quantity', C(30), CMP.LTE)
-                        & Q('p_size', C(1), CMP.GTE) & Q('p_size', C(15), CMP.LTE)
-                        & Q('l_shipmode', ('AIR', 'AIR REG'), CMP.IN )
-                        & Q('l_shipinstruct', C('DELIVER IN PERSON'))
+                        & Q('p_size', C(15), CMP.LTE)
                     )
                 );
     t = t.project(({F('l_extendedprice')*(1 - F('l_discount')):'rev'},));
