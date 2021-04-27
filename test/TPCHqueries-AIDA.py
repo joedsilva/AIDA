@@ -1057,7 +1057,7 @@ where
     l = l.filter(Q('l_shipmode', ('AIR', 'AIR REG'), CMP.IN )
                         & Q('l_shipinstruct', C('DELIVER IN PERSON')))
     p = p.filter(Q('p_size', C(1), CMP.GTE))
-    t = l.join(p, None, None, COL.ALL, COL.ALL, join=JOIN.CROSS_JOIN);
+    t = l.join(p, 'l_partkey', 'p_partkey', COL.ALL, COL.ALL);
     t = t.filter(
                     (
                         Q('p_partkey', 'l_partkey')
