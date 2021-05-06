@@ -23,9 +23,9 @@ class BaseTest(unittest.TestCase):
         #     if col.dtypes == 'int64':
         #         col.astype('int32')
         self.assertEqual(result.shape, expected[1])
-        print(f'{result.head(10)} \n*****\n {result.head(10).dtypes}')
+        # print(f'{result.head(10)} \n*****\n {result.head(10).dtypes}')
         print('-------------------------------')
-        print(f'{expected[0].head(10)}\n*****\n {expected[0].head(10).dtypes}')
+        # print(f'{expected[0].head(10)}\n*****\n {expected[0].head(10).dtypes}')
         print(result.head(10).equals(expected[0].head(10)))
         print('\n')
         self.assertTrue(result.head(self.range).equals(expected[0]))

@@ -59,7 +59,7 @@ class PandasTest(unittest.TestCase):
     def validateQueryOutput(self, expected, real):
         # pandas dataframe
         if isinstance(expected, pd.DataFrame):
-            self.assertTrue(expected.equals(real), f'expected = {expected.dtypes} \n real = {real.dtypes}')
+            self.assertTrue(expected.equals(real), 'expected = {} \n real = {}'.format(expected.dtypes, real.dtypes))
         #     self.assertEqual(expected.shape, real.shape, "The shape of expected and real are different")
         #     # convert column data type
         #     for ecol, rcol in zip(expected.columns, real.columns):
@@ -93,13 +93,13 @@ class PandasTest(unittest.TestCase):
         print(real)
 
     def runQuery(self, q):
-        print(f'-------------test q{q}-------------')
+        print('-------------test q{}-------------'.format(q))
         r = getattr(tpchqueries, 'q' + q)(db)
         if (hasattr(r, '_genSQL_')):
             r.loadData()
 
         real = r.rows if hasattr(r, '_genSQL_') else r
-        expected = load_monet_result(f'monet_{q}')
+        expected = load_monet_result('monet_{q}'.format(q))
         self.validateQueryOutput(expected, real)
 
     def test_q01(self):

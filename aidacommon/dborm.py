@@ -222,7 +222,7 @@ class F:
         return val;
 
     def __str__(self):
-        return f'F: {self._col1_}, {self._col2_}, {self._operator_}'
+        return 'F: {0}, {1}, {2}'.format(self._col1_, self._col2_, self._operator_)
 
     def __init__(self, col1, col2=None, operator=None):
         self._col1_ = col1;

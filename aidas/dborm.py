@@ -82,15 +82,15 @@ class SQLSelectTransform(SQLTransform):
     def execute_pandas(self):
         conditions = None
         data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
-        logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
+        #logging.info(f'[{time.ctime()}] execute transform pandas, data type = {type(data)}')
 
         #convert ordered dict to pandas df
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
 
         for sc in self.__selcols__:
-            logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
-            logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
+            # logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
+            # logging.info(f'[{time.ctime()}] operator: {sc._operator_}, col1: {sc._col1_}, col2: {sc._col2_}')
             operator = sc._operator_
             if conditions is None:
                 conditions = select2pandas(data, sc)
@@ -98,13 +98,13 @@ class SQLSelectTransform(SQLTransform):
                 conditions = conditions & select2pandas(data, sc)
 
         data = data[conditions]
-        logging.info(f'[{time.ctime()}] executed pandas select, condition = {conditions}, data = {data.head(3)}')
+        # logging.info(f'[{time.ctime()}] executed pandas select, condition = {conditions}, data = {data.head(3)}')
 
         return data
 
     @property
     def genSQL(self):
-        logging.info(f'[{time.ctime()}] generating sql for SQLSelectTransform {self.__selcols__}, source type: {self._source_}')
+        # logging.info(f'[{time.ctime()}] generating sql for SQLSelectTransform {self.__selcols__}, source type: {self._source_}')
         selCondition = '';
         for sc in self.__selcols__: #iterate through the filter conditions.
             #logging.info(f'[{time.ctime()}] condition : {sc}, Expression: {sc.columnExpr}, collist: {sc.srcColList}')
@@ -193,8 +193,8 @@ class SQLJoinTransform(SQLTransform):
     def execute_pandas(self):
         data1 = self._source1_.__pdData__ if self._source1_.__pdData__ is not None else self._source1_.execute_pandas()
         data2 = self._source2_.__pdData__ if self._source2_.__pdData__ is not None else self._source2_.execute_pandas()
-        logging.info(f'[{time.ctime()}] execute join pandas, data1 = {data1.head()}, \n data2 = {data2.head()} \n -----------------------------------\n '
-                     f'query = {self.genSQL} \n -------------------------- -----------\n')
+        # logging.info(f'[{time.ctime()}] execute join pandas, data1 = {data1.head()}, \n data2 = {data2.head()} \n -----------------------------------\n '
+        #              f'query = {self.genSQL} \n -------------------------- -----------\n')
         #logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
         #convert ordered dict to pandas df
         if not isinstance(data1, pd.DataFrame):
@@ -207,9 +207,9 @@ class SQLJoinTransform(SQLTransform):
 
         proj_cols = [c.columnName if not isinstance(c, str) else c for c in self.__columns__]
         if self._jointype_ == JOIN.CROSS_JOIN:
-            logging.info(
-                f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, '
-                f'data1 columns= {data1.columns}, \n data2 = {data2.columns}')
+            # logging.info(
+            #     f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, '
+            #     f'data1 columns= {data1.columns}, \n data2 = {data2.columns}')
             data1['_key'] = 0
             data2['_key'] = 0
             data = data1.merge(data2, on='_key')
@@ -358,8 +358,8 @@ class SQLAggregateTransform(SQLTransform):
                 rename_params[(g, '')] = g
                 group_cols.append(g)
 
-        logging.info(
-            f'self column info: {self.columns} \n group_cols = {group_cols} \n, data columns= {data.columns}, \n data = {data.head()}')
+        # logging.info(
+        #     f'self column info: {self.columns} \n group_cols = {group_cols} \n, data columns= {data.columns}, \n data = {data.head()}')
         # get groupbyDataframe
         if group_cols:
             data = data.groupby(group_cols)
@@ -405,9 +405,9 @@ class SQLAggregateTransform(SQLTransform):
         else:
             # dummy operation, to get pd.dateframe object
             data = data.count()
-        logging.info(
-            f'Agg pandas, pandas columns = {data.columns}, proj_col = {proj_cols}, groups = {group_cols}, '
-            f'rename = {rename_params} \n {data.head(10)}')
+        # logging.info(
+        #     f'Agg pandas, pandas columns = {data.columns}, proj_col = {proj_cols}, groups = {group_cols}, '
+        #     f'rename = {rename_params} \n {data.head(10)}')
 
         if count_col is not None:
             data = data.assign(_count=count_col)
@@ -418,7 +418,7 @@ class SQLAggregateTransform(SQLTransform):
         if rename_params:
             # data.rename(columns=rename_params, inplace=True)
             data.rename(**{'columns': rename_params, 'inplace': True})
-        logging.info(f'Agg pandas, pandas columns = {data.columns}, proj_col = {proj_cols}, groups = {group_cols}, rename = {rename_params} \n {data.head(10)}')
+        # logging.info(f'Agg pandas, pandas columns = {data.columns}, proj_col = {proj_cols}, groups = {group_cols}, rename = {rename_params} \n {data.head(10)}')
         return data[proj_cols]
 
     @property
@@ -466,8 +466,8 @@ class SQLProjectionTransform(SQLTransform):
                 #logging.info(f'{time.ctime()} Project columns: c = {c}, c type = {type(c)}, \n'
                              # f'sc1={sc1}, type sc1 = {type(sc1)}, pc1={pc1}, type pc1={type(pc1)}, '
                              # f'collist = {collist}, expAlias = {exp}')
-                if hasattr(sc1, "__dict__"):
-                    items = [f'{key}: {val}' for key, val in sc1.__dict__.items()]
+                # if hasattr(sc1, "__dict__"):
+                #     items = [f'{key}: {val}' for key, val in sc1.__dict__.items()]
                     #logging.info(', '.join(items))
                     #get a list of source columns needed for this expression.
                 srccollist = [sc1] if(isinstance(sc1, str)) else ( sc1.srcColList if(hasattr(sc1, 'srcColList')) else []  )
@@ -507,8 +507,8 @@ class SQLProjectionTransform(SQLTransform):
     def execute_pandas(self):
         self.columns
         data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
-        logging.info(f'[{time.ctime()}] execute projection pandas, data = {data.columns}, type = {data.dtypes}\n--------------------------\n '
-                     f'sql = {self.genSQL} \n--------------------------\n')
+        # logging.info(f'[{time.ctime()}] execute projection pandas, data = {data.columns}, type = {data.dtypes}\n--------------------------\n '
+        #              f'sql = {self.genSQL} \n--------------------------\n')
 
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
@@ -529,8 +529,8 @@ class SQLProjectionTransform(SQLTransform):
                 sc1 = pc1 = c;  # otherwise projected column name / function is the same as the source column.
 
             #logging.info(f'{time.ctime()} Project columns: c = {c}, c type = {type(c)}, \n')
-            if hasattr(sc1, "__dict__"):
-                items = [f'{key}: {val}' for key, val in sc1.__dict__.items()]
+            # if hasattr(sc1, "__dict__"):
+            #     items = [f'{key}: {val}' for key, val in sc1.__dict__.items()]
                 #logging.info(', '.join(items))
 
             if isinstance(sc1, str): # case {'col'} or {'col': 'new col'}
@@ -543,11 +543,11 @@ class SQLProjectionTransform(SQLTransform):
 
         # get all columns required, and do computation on columns if needed
         data = data.assign(**assign_params)[proj_cols] if assign_params else data[proj_cols]
-        logging.info(f'{time.ctime()} proj_cols: {proj_cols} \n rename_param: {rename_params} \n assign_param: {assign_params}')
+        # logging.info(f'{time.ctime()} proj_cols: {proj_cols} \n rename_param: {rename_params} \n assign_param: {assign_params}')
         #rename columns if required
         if rename_params:
             data.rename(**{'columns': rename_params, 'inplace': True})
-        logging.info(f"Projection result = {data}, type = {data.dtypes}")
+        # logging.info(f"Projection result = {data}, type = {data.dtypes}")
         return data
 
 
@@ -572,7 +572,7 @@ class SQLOrderTransform(SQLTransform):
 
     def execute_pandas(self, doOrder=True):
         data = self._source_.__pdData__ if self._source_.__pdData__ is not None else self._source_.execute_pandas()
-        logging.info(f'[{time.ctime()}] execute order pandas, data type = {type(data)}')
+        # logging.info(f'[{time.ctime()}] execute order pandas, data type = {type(data)}')
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame.from_dict(data)
 
@@ -580,7 +580,7 @@ class SQLOrderTransform(SQLTransform):
             return data
         else:
             colorderlist = [self._colorderlist_] if(isinstance(self._colorderlist_, str)) else self._colorderlist_;
-            logging.info(f'order vars: {colorderlist}')
+            # logging.info(f'order vars: {colorderlist}')
             sortcol = []
             sortascend = []
             for ocol in colorderlist:
@@ -593,7 +593,7 @@ class SQLOrderTransform(SQLTransform):
                 else:
                     sortcol.append(ocol);
                     sortascend.append(True)
-            logging.info(f'sort col = {sortcol}, sortascend = {sortascend}')
+            # logging.info(f'sort col = {sortcol}, sortascend = {sortascend}')
             data = data.sort_values(by=sortcol, ascending=sortascend)
             return data
 
@@ -1362,9 +1362,9 @@ class DBTable(TabularData):
         if self.__pdData__ is None:
             t0 = time.time()
             data = pd.DataFrame(self.__data__)
-            logging.info(f"[{time.ctime()}] pandas type = {data.dtypes}")
+            # logging.info(f"[{time.ctime()}] pandas type = {data.dtypes}")
             t1 = time.time()
-            logging.info(f'{self.tableName} convert time = {t1 - t0}')
+            # logging.info(f'{self.tableName} convert time = {t1 - t0}')
             self.__pdData__ = data
         return self.__pdData__
 
@@ -1806,18 +1806,18 @@ class DataFrame(TabularData):
     def rows(self):
         #logging.debug("DataFrame: id {}, {} : rows called.".format(id(self), self.tableName));
         if(self.__data__ is None):
-            logging.info(f'[{time.ctime()}]No data available, transform = {self.__transform__}')
+            # logging.info(f'[{time.ctime()}]No data available, transform = {self.__transform__}')
             #logging.debug("DataFrame: {} : rows called, need to produce data.".format(self.tableName));
             if(self.isDBQry):
                 data = self.execute_pandas()
                 self.pdData = data
                 if data is None:
-                    logging.info(f'[{time.ctime()}]Generating data by _genSQL,')
+                    logging.info('[{}]Generating data by _genSQL'.format(time.ctime()))
                     (data, rows) = self.dbc._executeQry(self._genSQL_(doOrder=True).sqlText + ';');
-                logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
+                # logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
                 #Convert the results to an ordered dictionary format.
                 if isinstance(data, pd.DataFrame):
-                    logging.info(f'[{time.ctime()}]final result dtypes = {data.dtypes}')
+                    logging.info('[{}]final result dtypes = {}'.format(time.ctime(), data.dtypes))
                     self.__pdData__ = data
                     #logging.info(f'Converting pd to dict, columns = {self.columns}')
                     data_ = collections.OrderedDict()
