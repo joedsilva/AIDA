@@ -1362,6 +1362,7 @@ class DBTable(TabularData):
         if self.__pdData__ is None:
             t0 = time.time()
             data = pd.DataFrame(self.__data__)
+            logging.info(f"[{time.ctime()}] pandas type = {data.dtypes}")
             t1 = time.time()
             logging.info(f'{self.tableName} convert time = {t1 - t0}')
             self.__pdData__ = data
@@ -1773,8 +1774,8 @@ class DataFrame(TabularData):
     genSQL = property(_genSQL_);
 
     def upstream_data_exist(self):
-        logging.info(f'[{time.ctime()}] Inside upstream_data_exists. Checking for data for {type(self)} {self}, has data = {self.__data__}, '
-                      f'source {self.__source__}, has type {type(self.__source__)}')
+        # logging.info(f'[{time.ctime()}] Inside upstream_data_exists. Checking for data for {type(self)} {self}, has data = {self.__data__}, '
+        #               f'source {self.__source__}, has type {type(self.__source__)}')
         if self.__data__ is not None or self.__pdData__ is not None:
             return True
         elif isinstance(self.__source__, tuple):
@@ -1816,6 +1817,7 @@ class DataFrame(TabularData):
                 logging.info(f'[{time.ctime()}]Before convert, type of data {type(data)}, data = \n {data}')
                 #Convert the results to an ordered dictionary format.
                 if isinstance(data, pd.DataFrame):
+                    logging.info(f'[{time.ctime()}]final result dtypes = {data.dtypes}')
                     self.__pdData__ = data
                     #logging.info(f'Converting pd to dict, columns = {self.columns}')
                     data_ = collections.OrderedDict()

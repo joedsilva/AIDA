@@ -28,9 +28,9 @@ def convert_type(func):
             sc = Q(sc._col1_, data[sc._col2_], sc._operator_)
         else:
             ndata = data[sc._col1_]
-        logging.info(
-            f'PAMP after converting: data={ndata.head(10)}, sc.col1={sc._col1_}, <data type: {data.dtypes}, '
-            f'col2={sc._col2_}, type: {type(sc._col2_)}')
+        # logging.info(
+        #     f'PAMP after converting: data={ndata.head(10)}, sc.col1={sc._col1_}, <data type: {data.dtypes}, '
+        #     f'col2={sc._col2_}, type: {type(sc._col2_)}')
         return func(ndata, sc)
 
     return inner
@@ -128,7 +128,7 @@ def map_in(data, sc):
     #change from pd.Dataframe to 1D ndarray
     if isinstance(sc._col2_, pd.DataFrame):
         sc._col2_ = sc._col2_.values.ravel()
-        logging.info(f'MAP_IN: data: {data}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
+        # logging.info(f'MAP_IN: data: {data}, col1 = {sc._col1_}, col2 = {sc._col2_} ')
         return data.isin(sc._col2_).squeeze()
     return data.isin(sc._col2_)
 
@@ -273,7 +273,7 @@ def f2pandas(data, f):
     @return: Output column
     """
     cols = [f._col1_, f._col2_]
-    logging.info(f"f2pandas col1: {cols[0]}, col2: {cols[1]}")
+    # logging.info(f"f2pandas col1: {cols[0]}, col2: {cols[1]}")
 
     if isinstance(f, SUBSTRING):
         col = f._col1_
@@ -288,13 +288,13 @@ def f2pandas(data, f):
         defval = f._deflt_._val_ if hasattr(f._deflt_, '_val_') else f._deflt_
         output = pd.DataFrame(defval, index=data.index, columns=['_output'])
         for (case, val) in f._cases_:
-            logging.info(f'F Case |||||| case: {case}: {type(case)}, val: {val}: {type(val)}, op={case._operator_}')
+            # logging.info(f'F Case |||||| case: {case}: {type(case)}, val: {val}: {type(val)}, op={case._operator_}')
             if isinstance(val, F):
                 val = f2pandas(data, val)
             # update the output column based on Q conditions
             cond = PCMP_MAP[case._operator_](data, case)
             output['_output'] = np.where(cond, val, output['_output'])
-            logging.info(f"after case: cond = {cond}, val = {val}, output={output}")
+            # logging.info(f"after case: cond = {cond}, val = {val}, output={output}")
         return output
     for i in range(len(cols)):
         if isinstance(cols[i], F):
@@ -304,5 +304,5 @@ def f2pandas(data, f):
             cols[i] = data[cols[i]]
         else:
             cols[i] = cols[i]
-    logging.info(f"f2pandas after: col1: {cols[0]}, col2: {cols[1]}")
+    # logging.info(f"f2pandas after: col1: {cols[0]}, col2: {cols[1]}")
     return fop2pandas(cols[0], cols[1], f._operator_)

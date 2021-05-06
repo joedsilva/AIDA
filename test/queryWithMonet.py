@@ -63,6 +63,7 @@ def run_test():
                 pickle.dump(r.rows, file)
             else:
                 print(r)
+                print(r.dtypes)
                 pickle.dump(r, file)
         print('Executing query took {}s'.format(t1 - t0))
 
