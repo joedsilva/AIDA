@@ -193,9 +193,9 @@ class SQLJoinTransform(SQLTransform):
     def execute_pandas(self):
         data1 = self._source1_.__pdData__ if self._source1_.__pdData__ is not None else self._source1_.execute_pandas()
         data2 = self._source2_.__pdData__ if self._source2_.__pdData__ is not None else self._source2_.execute_pandas()
-        # logging.info(f'[{time.ctime()}] execute join pandas, data1 = {data1.head()}, \n data2 = {data2.head()} \n -----------------------------------\n '
-        #              f'query = {self.genSQL} \n -------------------------- -----------\n')
-        #logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
+        logging.info(f'[{time.ctime()}] execute join pandas, data1 = {data1.head()}, \n data2 = {data2.head()} \n -----------------------------------\n '
+                     f'query = {self.genSQL} \n -------------------------- -----------\n')
+        logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
         #convert ordered dict to pandas df
         if not isinstance(data1, pd.DataFrame):
             data1 = pd.DataFrame.from_dict(data1)
@@ -205,11 +205,11 @@ class SQLJoinTransform(SQLTransform):
         rename_params = self.get_rename_cols(self._src1projcols_)
         rename_params.update(self.get_rename_cols(self._src2projcols_))
 
-        proj_cols = [c.columnName if not isinstance(c, str) else c for c in self.__columns__]
+        proj_cols = [c.columnName if not isinstance(c, str) else c for c in self.columns]
         if self._jointype_ == JOIN.CROSS_JOIN:
-            # logging.info(
-            #     f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, '
-            #     f'data1 columns= {data1.columns}, \n data2 = {data2.columns}')
+            logging.info(
+                f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, '
+                f'data1 columns= {data1.columns}, \n data2 = {data2.columns}')
             data1['_key'] = 0
             data2['_key'] = 0
             data = data1.merge(data2, on='_key')
@@ -217,7 +217,6 @@ class SQLJoinTransform(SQLTransform):
             data = pd.merge(data1, data2, left_on=self._src1joincols_, right_on=self._src2joincols_,
                             how=PJOIN_MAP[self._jointype_])
         if rename_params:
-            # data.rename(columns=rename_params, inplace=True)
             data.rename(**{'columns': rename_params, 'inplace': True})
         return data[proj_cols]
 
