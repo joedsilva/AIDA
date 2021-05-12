@@ -8,7 +8,7 @@ passwd = 'sf01'
 jobName = 'test'
 port = 55660
 
-SF = 0.01 #used by query 11. indicate the scale factor of the tpch database.
+SF = 1 #used by query 11. indicate the scale factor of the tpch database.
 
 udfVSvtable = True
 
