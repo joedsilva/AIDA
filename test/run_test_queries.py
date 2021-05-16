@@ -40,7 +40,7 @@ class Database:
 
 
 def load_monet_result(path):
-    with open(f'{config.outputDir}/{path}', 'rb') as f:
+    with open('{}/{}'.format(config.outputDir, path), 'rb') as f:
         data = pickle.load(f)
     return data
 

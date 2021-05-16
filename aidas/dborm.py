@@ -193,9 +193,9 @@ class SQLJoinTransform(SQLTransform):
     def execute_pandas(self):
         data1 = self._source1_.__pdData__ if self._source1_.__pdData__ is not None else self._source1_.execute_pandas()
         data2 = self._source2_.__pdData__ if self._source2_.__pdData__ is not None else self._source2_.execute_pandas()
-        logging.info(f'[{time.ctime()}] execute join pandas, data1 = {data1.head()}, \n data2 = {data2.head()} \n -----------------------------------\n '
-                     f'query = {self.genSQL} \n -------------------------- -----------\n')
-        logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
+        # logging.info(f'[{time.ctime()}] execute join pandas, data1 = {data1.head()}, \n data2 = {data2.head()} \n -----------------------------------\n '
+        #              f'query = {self.genSQL} \n -------------------------- -----------\n')
+        # logging.info(f'[{time.ctime()}] execute join pandas, data2 type = {type(data1)}')
         #convert ordered dict to pandas df
         if not isinstance(data1, pd.DataFrame):
             data1 = pd.DataFrame.from_dict(data1)
