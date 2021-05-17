@@ -8,7 +8,7 @@ $MONETDB/bin/monetdbd start $DBFARMBASE
 cur=$(pwd)
 cd $home/AIDA/aidaMonetDB/scripts
 
-export DOTMONETDBFILE=$MONETDB/.${dbuser}
+export DOTMONETDBFILE=$MONETDB/sec/.${dbuser}
 ./startup_monetdb.sh $dbuser
 
 cd $cur

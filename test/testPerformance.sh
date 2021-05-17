@@ -9,6 +9,6 @@ do
     printf "restart server\n";
     ./restart.sh sf01;
     echo "run test $query";
-    python runTPCH-AIDA.py $query;
+    python3 runTPCH-AIDA.py $query;
   done;
 done;
