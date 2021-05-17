@@ -1,4 +1,6 @@
+import cProfile
 import time;
+import timeit
 import weakref;
 import collections;
 import re;
@@ -1794,6 +1796,9 @@ class DataFrame(TabularData):
         if self.upstream_data_exist():
             if self.__transform__ is not None:
                 #logging.info(f'[{time.ctime()}] executePandasSql: is transform')
+                stmt = 'self.__transform__.execute_pandas()'
+                profile = cProfile.runctx(stmt, globals(), locals(), 'cProfile')
+                logging.info('[{}]\n {}'.format(time.ctime(), profile))
                 return self.__transform__.execute_pandas()
             if self.__data__ is not None and (self.__pdData__ is None):
                 self.__pdData__ = pd.DataFrame(self.__data__)
