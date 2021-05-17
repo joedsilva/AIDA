@@ -125,7 +125,7 @@ class SQLSelectTransform(SQLTransform):
                          '(' + (self._source_.genSQL.sqlText) + ') ' + self._source_.tableName +
                       ' WHERE ' + selCondition
                     );
-        logging.info(f"{time.ctime()}] Generated selection sql: \"{sqlText}\"")
+        #logging.info(f"{time.ctime()}] Generated selection sql: \"{sqlText}\"")
         return SQLQuery(sqlText);
 
 
@@ -207,9 +207,9 @@ class SQLJoinTransform(SQLTransform):
 
         proj_cols = [c.columnName if not isinstance(c, str) else c for c in self.columns]
         if self._jointype_ == JOIN.CROSS_JOIN:
-            logging.info(
-                f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, '
-                f'data1 columns= {data1.columns}, \n data2 = {data2.columns}')
+            #logging.info(
+            #    f'column info: {self.columns} \n proj_cols = {proj_cols} , rename = {rename_params} \n, '
+            #    f'data1 columns= {data1.columns}, \n data2 = {data2.columns}')
             data1['_key'] = 0
             data2['_key'] = 0
             data = data1.merge(data2, on='_key')

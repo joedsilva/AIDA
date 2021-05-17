@@ -54,7 +54,7 @@ else:
 
 #@profile
 def run_test():
-    with open('{}/time-AIDA.csv'.format(config.outputDir), 'a') as f:
+    with open('{}/time-node07-v2.csv'.format(config.outputDir), 'a') as f:
         for q in queries:
             print('----------[ Query {0} ]----------'.format(q))
             t0 = time()
