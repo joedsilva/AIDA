@@ -125,7 +125,7 @@ class SQLSelectTransform(SQLTransform):
                          '(' + (self._source_.genSQL.sqlText) + ') ' + self._source_.tableName +
                       ' WHERE ' + selCondition
                     );
-        logging.info(f"{time.ctime()}] Generated selection sql: \"{sqlText}\"")
+        #logging.info(f"{time.ctime()}] Generated selection sql: \"{sqlText}\"")
         return SQLQuery(sqlText);
 
 

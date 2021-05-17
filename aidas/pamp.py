@@ -12,7 +12,7 @@ def convert_type(func):
         from aidas.dborm import DataFrame
         if isinstance(sc._col2_, DATE):
             ndata = pd.to_datetime(data[sc._col1_], format='%Y-%m-%d', errors='coerce')
-            sc = Q(sc._col1_, sc._col2_.__date__, sc._operator_)
+            sc = Q(sc._col1_, np.datetime64(sc._col2_.__date__), sc._operator_)
         elif isinstance(sc._col2_, C):
             ndata = data[sc._col1_]
             sc = Q(sc._col1_, sc._col2_._val_, sc._operator_)
@@ -38,61 +38,61 @@ def convert_type(func):
 
 @convert_type
 def map_eq(data, sc):
-    return np.where(data == sc._col2_, True, False)
+    return np.where(data.to_numpy() == sc._col2_, True, False)
 
 
 @convert_type
 def map_ne(data, sc):
-    return np.where(data != sc._col2_, True, False)
+    return np.where(data.to_numpy() != sc._col2_, True, False)
 
 
 @convert_type
 def map_gt(data, sc):
-    return np.where(data > sc._col2_, True, False)
+    return np.where(data.to_numpy() > sc._col2_, True, False)
 
 
 @convert_type
 def map_gte(data, sc):
-    return np.where(data >= sc._col2_, True, False)
+    return np.where(data.to_numpy() >= sc._col2_, True, False)
 
 
 @convert_type
 def map_lt(data, sc):
-    return np.where(data < sc._col2_, True, False)
+    return np.where(data.to_numpy() < sc._col2_, True, False)
 
 
 @convert_type
 def map_lte(data, sc):
-    return np.where(data <= sc._col2_, True, False)
+    return data.to_numpy() <= sc._col2_
 
 
 @convert_type
 def map_gtall(data, sc):
-    return data > max(sc._col2_)
+    return data.to_numpy() > max(sc._col2_)
 
 
 @convert_type
 def map_gtany(data, sc):
-    return data > min(sc._col2_)
+    return data.to_numpy() > min(sc._col2_)
 
 
 @convert_type
 def map_gteall(data, sc):
-    return data >= max(sc._col2_)
+    return data.to_numpy() >= max(sc._col2_)
 
 
 @convert_type
 def map_gteany(data, sc):
-    return data >= min(sc._col2_)
+    return data.to_numpy() >= min(sc._col2_)
 
 @convert_type
 def map_ltall(data, sc):
-    return data < min(sc._col2_)
+    return data.to_numpy() < min(sc._col2_)
 
 
 @convert_type
 def map_ltany(data, sc):
-    return data > max(sc._col2_)
+    return data.to_numpy() > max(sc._col2_)
 
 
 @convert_type
@@ -102,7 +102,7 @@ def map_lteall(data, sc):
 
 @convert_type
 def map_lteany(data, sc):
-    return data <= max(sc._col2_)
+    return data.to_numpy() <= max(sc._col2_)
 
 
 def map_or(data, sc):
@@ -242,7 +242,23 @@ def extract_src_col(s):
     if match:
         return match.group(1)
 
+
 def fop2pandas(data1, data2, op):
+    if op == F.OP.YEAR:
+        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
+        return ndata.dt.year.astype('int32')
+    if op == F.OP.MONTH:
+        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
+        return ndata.dt.month.astype('int32')
+    if op == F.OP.DAY:
+        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
+        return ndata.dt.day.astype('int32')
+
+    if isinstance(data1, pd.DataFrame):
+        data1 = data1.to_numpy()
+    if data2 is not None and isinstance(data2, pd.DataFrame):
+        data2 = data2.to_numpy()
+
     if op == F.OP.ADD:
         return data1 + data2
     if op == F.OP.SUBTRACT:
@@ -253,15 +269,6 @@ def fop2pandas(data1, data2, op):
         return data1 / data2
     if op == F.OP.NEGATIVE:
         return -data1
-    if op == F.OP.YEAR:
-        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
-        return ndata.dt.year.astype('int32')
-    if op == F.OP.MONTH:
-        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
-        return ndata.dt.month.astype('int32')
-    if op == F.OP.DAY:
-        ndata = pd.to_datetime(data1, format='%Y-%m-%d', errors='coerce')
-        return ndata.dt.day.astype('int32')
     return data1
 
 

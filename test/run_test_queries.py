@@ -59,29 +59,29 @@ class PandasTest(unittest.TestCase):
     def validateQueryOutput(self, expected, real):
         # pandas dataframe
         if isinstance(expected, pd.DataFrame):
-            self.assertTrue(expected.equals(real), 'expected = {} \n real = {}'.format(expected.dtypes, real.dtypes))
-        #     self.assertEqual(expected.shape, real.shape, "The shape of expected and real are different")
-        #     # convert column data type
-        #     for ecol, rcol in zip(expected.columns, real.columns):
-        #         if expected[ecol].dtypes == float:
-        #             e = expected[ecol].astype(np.float32)
-        #             r = real[rcol].astype(np.float32)
-        #
-        #             # there might be numerical error, check rows one by one to allow small errors
-        #             for i in range(len(e)):
-        #                 self.assertTrue(e.iloc[i] - r.iloc[i] < EPSILON, f"Column {ecol} at row {i} are not equal")
-        #             continue
-        #
-        #         if expected[ecol].dtypes in [int, np.int32, np.int16, np.int64]:
-        #             print('inside int')
-        #             e = expected[ecol].astype('int32')
-        #             r = real[rcol].astype('int32')
-        #         else:
-        #             e = expected[ecol]
-        #             r = real[rcol]
-        #         print(f'col: {ecol}, expected_type: {e.dtypes}, real_type: {r.dtypes}')
-        #         self.assertTrue(e.equals(r), f"Column {ecol} are not equal")
-        # # ordered dict
+            #self.assertTrue(expected.equals(real), 'expected = {} \n real = {}'.format(expected.dtypes, real.dtypes))
+            self.assertEqual(expected.shape, real.shape, "The shape of expected and real are different")
+            # convert column data type
+            for ecol, rcol in zip(expected.columns, real.columns):
+                if expected[ecol].dtypes == float:
+                    e = expected[ecol].astype(np.float32)
+                    r = real[rcol].astype(np.float32)
+
+                    # there might be numerical error, check rows one by one to allow small errors
+                    for i in range(len(e)):
+                        self.assertTrue(e.iloc[i] - r.iloc[i] < EPSILON, f"Column {ecol} at row {i} are not equal")
+                    continue
+
+                if expected[ecol].dtypes in [int, np.int32, np.int16, np.int64]:
+                    print('inside int')
+                    e = expected[ecol].astype('int32')
+                    r = real[rcol].astype('int32')
+                else:
+                    e = expected[ecol]
+                    r = real[rcol]
+                print(f'col: {ecol}, expected_type: {e.dtypes}, real_type: {r.dtypes}')
+                self.assertTrue(e.equals(r), f"Column {ecol} are not equal")
+        # ordered dict
         else:
             self.assertEqual(len(expected), len(real))
             for e, r in zip(expected, real):
@@ -99,7 +99,7 @@ class PandasTest(unittest.TestCase):
             r.loadData()
 
         real = r.rows if hasattr(r, '_genSQL_') else r
-        expected = load_monet_result('monet_{q}'.format(q))
+        expected = load_monet_result('monet_{}'.format(q))
         self.validateQueryOutput(expected, real)
 
     def test_q01(self):
