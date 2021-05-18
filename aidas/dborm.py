@@ -16,6 +16,7 @@ from aidacommon.dborm import *;
 from aidacommon.dbAdapter import DBC;
 from aidas.pamp import *
 from aidacommon.utils import VirtualOrderedColumnsDict;
+from aidas.BlockManagerUnconsolidated import df_from_arrays
 
 #Simple wrapper class to encapsulate a query string.
 class SQLQuery:
@@ -1362,10 +1363,10 @@ class DBTable(TabularData):
     def execute_pandas(self):
         if self.__pdData__ is None:
             t0 = time.time()
-            data = pd.DataFrame(self.__data__)
-            # logging.info(f"[{time.ctime()}] pandas type = {data.dtypes}")
+            data = df_from_arrays(self.__data__.values(), self.__data__.keys(), range(self.numRows))
+            #logging.info(f"[{time.ctime()}] pandas type = {data.dtypes}")
             t1 = time.time()
-            # logging.info(f'{self.tableName} convert time = {t1 - t0}')
+            logging.info(f'{self.tableName} convert time = {t1 - t0}')
             self.__pdData__ = data
         return self.__pdData__
 
@@ -1796,12 +1797,12 @@ class DataFrame(TabularData):
         if self.upstream_data_exist():
             if self.__transform__ is not None:
                 #logging.info(f'[{time.ctime()}] executePandasSql: is transform')
-                stmt = 'self.__transform__.execute_pandas()'
-                profile = cProfile.runctx(stmt, globals(), locals(), 'cProfile')
-                logging.info('[{}]\n {}'.format(time.ctime(), profile))
+                # stmt = 'self.__transform__.execute_pandas()'
+                # profile = cProfile.runctx(stmt, globals(), locals(), 'cProfile')
+                # logging.info('[{}]\n {}'.format(time.ctime(), profile))
                 return self.__transform__.execute_pandas()
             if self.__data__ is not None and (self.__pdData__ is None):
-                self.__pdData__ = pd.DataFrame(self.__data__)
+                self.__pdData__ = df_from_arrays(self.__data__.values(), self.__data__.keys(), range(self.numRows))
 
             return self.__pdData__ if self.__pdData__ is not None else self.__source__.execute_pandas()
         return None
